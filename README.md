@@ -17,7 +17,7 @@ and [pandas](https://pandas.pydata.org/)
 python libraries. You can follow the Python User Guide
 for [Installing Packages](https://packaging.python.org/tutorials/installing-packages/)
 
-*Or*, run this from bash/cmd:
+*Or*, run the following in bash/cmd:
 
 1. Ensure pip, setuptools, and wheel are up to date:
 
@@ -31,8 +31,27 @@ python -m pip install --upgrade pip setuptools wheel
 pip install bs4 Request urlopen pandas
 ```
 
-You should see messages like *"Successfully installed XYZ package"* in the console
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; You should see messages like *"Successfully installed XYZ package"* in the console
 window.
+
+3. You might also need to install lxml if you run into an error running 
+[scraping.py](./scraping.py). If you see the following error:
+
+```
+bs4.FeatureNotFound: Couldn't find a tree builder with the features you requested: lxml. 
+Do you need to install a parser library?
+```
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Then follow this [Stackoverflow post](https://stackoverflow.com/a/26856894), 
+which basically says to install lxml:
+
+```console
+pip install lxml
+```
+
+4. Run the [scraping.py](./scraping.py) scipt using Python in bash/cmd or with
+an IDE like [IDLE](https://docs.python.org/3/library/idle.html). The scraping
+script takes a while to run, so give it a chance to run.
 
 ## *Random Note:* an IDLE Dark Mode Theme
 Place [config-highlight.cfg](./config-highlight.cfg) inside **~HOMEDIR~**/.idlerc/ and go to 
