@@ -3,6 +3,7 @@ from urllib.request import Request, urlopen
 import pandas as pd
 
 website = "https://www.thecarconnection.com"
+csvFile = "new_cars.csv"
 
 def fetch(hostname, filename):
     return bs.BeautifulSoup(urlopen(Request(hostname + filename, headers={'User-Agent': 'X'})).read(), 'lxml')
@@ -47,8 +48,8 @@ def trims():
             trim_list.append(div_a[-i]['href'])
     return trim_list
 
-pd.DataFrame(trims()).to_csv(<REDACTED>, index=False, header=None)
-trims = pd.read_csv(<REDACTED>)
+pd.DataFrame(trims()).to_csv(csvFile, index=False, header=None)
+trims = pd.read_csv(csvFile)
 
 def specifications():
     specifications_table = pd.DataFrame()
@@ -65,4 +66,4 @@ def specifications():
         specifications_table = pd.concat([specifications_table, specifications_df], axis=1, sort=False)
     return specifications_table
 
-specifications().to_csv(<REDACTED>)
+specifications().to_csv(csvFile)
