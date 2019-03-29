@@ -1,16 +1,32 @@
+import logging
 import bs4 as bs
 from urllib.request import Request, urlopen
 import pandas as pd
-import logging
 
 website = "https://www.thecarconnection.com"
 csvFile = "new_cars.csv"
 
+print("************** Starting... **************")
+
 # Some logging for scraping.py, to both understand the script better and have debug info if it crashes
-# or dies mid scrap. Logging is built into Python, info from: https://realpython.com/python-logging/
-logging.basicConfig(filename='scrapping.log', filemode='w',
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logging.info("This will get logged to  a file called scrapping.log")
+# or dies mid scrap. Logging is built into Python
+# https://realpython.com/python-logging/
+logging.basicConfig(filename='scrapping.log',
+                    filemode='w',
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    datefmt='%m-%d-%yT%H:%M:%S',
+                    level=logging.DEBUG)
+
+# Setup logging to the console too
+# https://stackoverflow.com/a/38613204
+console = logging.StreamHandler()
+console.setLevel(logging.DEBUG)
+# Format: DateTime: <message>
+formatter = logging.Formatter('%(asctime)s: %(message)s', '%m-%d-%y %H:%M:%S')
+console.setFormatter(formatter)
+logging.getLogger('').addHandler(console)
+
+logging.info('This will get logged to a file called scrapping.log')
 
 def fetch(hostname, filename):
     return bs.BeautifulSoup(urlopen(Request(hostname + filename, headers={'User-Agent': 'X'})).read(), 'lxml')
@@ -56,37 +72,42 @@ def model_menu():
             # Seems like this gets each additional Model Year, such as:
             # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
             # Which would be "2018"
-            logging.info("Additional Model Years: %", div['href'])
+            logging.info("Additional Model Years: %s", div['href'])
     return model_menu_list
 
 # Specs for each Make + Model + Year?
+#
 def year_model_overview():
     year_model_overview_list = []
     for make in model_menu():
         for id in fetch(website, make).find_all("a", {"id": "ymm-nav-specs-btn"}):
             year_model_overview().append(id['href'])
-            print ("year_model_overview: " + id['href'])
+            logging.info("year_model_overview: %s", id['href'])
     year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
     return year_model_overview_list
 
+# This must be all the trims for a given Model Year, like:
+# 
 def trims():
     trim_list = []
-    print ("Trims Time")
+    logging.info("Trims Time")
     for row in year_model_overview():
         div = fetch(website, row).find_all("div", {"class": "block-inner"})[-1]
         div_a = div.find_all("a")
-        print("Trims div: " + div)
-        print("Trims div_a: " + div_a)
+        logging.info("Trims div: %s", div)
+        logging.info("Trims div_a: %s", div_a)
         for i in range(len(div_a)):
             trim_list.append(div_a[-i]['href'])
-            print("i in range(len(div_a)): " + div_a[-i]['href'])
+            logging.info("i in range(len(div_a)): %s", div_a[-i]['href'])
     return trim_list
 
-print ("Starting scraping.py ...")
+logging.info("Starting scraping.py ...")
 pd.DataFrame(trims()).to_csv(csvFile, index=False, header=None)
-print ("Scrapping **DONE**")
+
+logging.info("Scrapping **DONE**")
 trims = pd.read_csv(csvFile)
 
+# This must grab specs for everything, looks like price + MSRP
 def specifications():
     specifications_table = pd.DataFrame()
     for row in trims.iloc[:, 0]:
@@ -102,5 +123,5 @@ def specifications():
         specifications_table = pd.concat([specifications_table, specifications_df], axis=1, sort=False)
     return specifications_table
 
-print ("Specifications time...")
+logging.info("Specifications time...")
 specifications().to_csv(csvFile)
