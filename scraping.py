@@ -22,6 +22,7 @@ logging.basicConfig(filename='scrapping.log',
 console = logging.StreamHandler()
 console.setLevel(logging.DEBUG)
 # Format: DateTime: <message>
+# http://strftime.org/
 formatter = logging.Formatter('%(asctime)s: %(message)s', '%m-%d-%y %H:%M:%S')
 console.setFormatter(formatter)
 logging.getLogger('').addHandler(console)
@@ -34,18 +35,24 @@ def fetch(hostname, filename):
 # Grabs all the Makes on https://www.thecarconnection.com/new-cars
 # Example: Ford, Chrysler, Toyota, etc
 #  Format: https://www.thecarconnection.com//make/new,toyota
+# Appears to be 43 of these
 def all_makes():
     all_makes_list = []
     for a in fetch(website, "/new-cars").find_all("a", {"class": "add-zip"}):
         all_makes_list.append(a['href'])
         # Ex: Found Car Make: /make/new,toyota
         # <a class="add-zip " href="/make/new,toyota" title="Toyota">Toyota</a>
-        logging.info("Found Car Make: %s", a['href'])
+        logging.debug("Found Car Make: %s", a['href'])
+
+    # Log how many makes we found with a different level so we can easily find it later
+    logging.info("Found %s Car Makes", len(all_makes_list))
+    
     return all_makes_list
 
 # Grabs each model for a given make
 # Example: Toyota Corolla
 #  Format: https://www.thecarconnection.com/cars/toyota_corolla
+# Appears to be *432* of these
 def make_menu():
     make_menu_list = []
     for make in all_makes():
@@ -53,10 +60,17 @@ def make_menu():
             make_menu_list.append(div.find_all("a")[0]['href'])
             # Ex: Found Model for /make/new,toyota: /cars/toyota_corolla
             # <a href="/cars/toyota_corolla">Toyota Corolla</a>
-            logging.info("Found Model for %s: %s", make, div.find_all("a")[0]['href'])
+            logging.debug("Found Model for %s: %s", make, div.find_all("a")[0]['href'])
+
+    # Log how many Make/Model combos we find
+    logging.info("Found %s Make & Model Combinations", len(make_menu_list))
+    
     return make_menu_list
 
-# Likely goes through the Make + Model?
+# Grabs all the years for every given make/model combination
+# Example: 2010 Toyota Corolla
+#  Format: https://www.thecarconnection.com/overview/toyota_corolla_2010
+# TBD how many of these there are
 def model_menu():
     model_menu_list = []
     for make in make_menu():
@@ -66,28 +80,36 @@ def model_menu():
             # I think this gets the current model year, such as:
             # <a class="btn avail-now 1" href="/overview/toyota_corolla_2019" title="2019 Toyota Corolla Review">2019</a>
             # Which would be "2019"
-            logging.info("Current Model Year: %s", div['href'])
+            logging.debug("Current Model Year: %s", div['href'])
         for div in soup.find_all("a", {"class": "btn 1"}):
             model_menu_list.append(div['href'])
             # Seems like this gets each additional Model Year, such as:
             # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
             # Which would be "2018"
-            logging.info("Additional Model Years: %s", div['href'])
+            logging.debug("Additional Model Years: %s", div['href'])
+
+    # Log how many Make/Model/Years combos we find
+    logging.info("Found %s Make/Model/Year Combinations", len(model_menu_list))
+    
     return model_menu_list
 
 # Specs for each Make + Model + Year?
-#
+# TBD
 def year_model_overview():
     year_model_overview_list = []
     for make in model_menu():
         for id in fetch(website, make).find_all("a", {"id": "ymm-nav-specs-btn"}):
             year_model_overview().append(id['href'])
-            logging.info("year_model_overview: %s", id['href'])
+            logging.debug("year_model_overview: %s", id['href'])
     year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
+
+    # Log how many of these combos we find
+    logging.info("Found %s Make/Model/Year/Spec Combinations", len(year_model_overview_list))
+    
     return year_model_overview_list
 
 # This must be all the trims for a given Model Year, like:
-# 
+# TBD
 def trims():
     trim_list = []
     logging.info("Trims Time")
@@ -99,6 +121,9 @@ def trims():
         for i in range(len(div_a)):
             trim_list.append(div_a[-i]['href'])
             logging.info("i in range(len(div_a)): %s", div_a[-i]['href'])
+
+    # Log how many of these combos we find
+            
     return trim_list
 
 logging.info("Starting scraping.py ...")
