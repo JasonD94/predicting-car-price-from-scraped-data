@@ -1,9 +1,16 @@
 import bs4 as bs
 from urllib.request import Request, urlopen
 import pandas as pd
+import logging
 
 website = "https://www.thecarconnection.com"
 csvFile = "new_cars.csv"
+
+# Some logging for scraping.py, to both understand the script better and have debug info if it crashes
+# or dies mid scrap. Logging is built into Python, info from: https://realpython.com/python-logging/
+logging.basicConfig(filename='scrapping.log', filemode='w',
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.info("This will get logged to  a file called scrapping.log")
 
 def fetch(hostname, filename):
     return bs.BeautifulSoup(urlopen(Request(hostname + filename, headers={'User-Agent': 'X'})).read(), 'lxml')
@@ -15,7 +22,9 @@ def all_makes():
     all_makes_list = []
     for a in fetch(website, "/new-cars").find_all("a", {"class": "add-zip"}):
         all_makes_list.append(a['href'])
-        print ("Found Car Make: " + a['href'])
+        # Ex: Found Car Make: /make/new,toyota
+        # <a class="add-zip " href="/make/new,toyota" title="Toyota">Toyota</a>
+        logging.info("Found Car Make: %s", a['href'])
     return all_makes_list
 
 # Grabs each model for a given make
@@ -26,7 +35,9 @@ def make_menu():
     for make in all_makes():
         for div in fetch(website, make).find_all("div", {"class": "name"}):
             make_menu_list.append(div.find_all("a")[0]['href'])
-            print ("Found Model: " + div.find_all("a")[0]['href'])
+            # Ex: Found Model for /make/new,toyota: /cars/toyota_corolla
+            # <a href="/cars/toyota_corolla">Toyota Corolla</a>
+            logging.info("Found Model for %s: %s", make, div.find_all("a")[0]['href'])
     return make_menu_list
 
 # Likely goes through the Make + Model?
@@ -36,10 +47,16 @@ def model_menu():
         soup = fetch(website, make)
         for div in soup.find_all("a", {"class": "btn avail-now first-item"}):
             model_menu_list.append(div['href'])
-            print ("First Make item: " + div['href'])
-        for div in soup.find_all("a", {"class": "btn 1"}): 
+            # I think this gets the current model year, such as:
+            # <a class="btn avail-now 1" href="/overview/toyota_corolla_2019" title="2019 Toyota Corolla Review">2019</a>
+            # Which would be "2019"
+            logging.info("Current Model Year: %s", div['href'])
+        for div in soup.find_all("a", {"class": "btn 1"}):
             model_menu_list.append(div['href'])
-            print ("Second Make item: " + div['href'])
+            # Seems like this gets each additional Model Year, such as:
+            # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
+            # Which would be "2018"
+            logging.info("Additional Model Years: %", div['href'])
     return model_menu_list
 
 # Specs for each Make + Model + Year?
