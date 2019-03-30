@@ -48,6 +48,8 @@ all_trims_list = []     # Make_Model_Year_Spec_Trim like Toyota Corolla 2010 XYZ
 # File Names for storing to & pulling from for future runs
 all_makes_file = "txt_files/all_makes_file.txt"
 all_models_file = "txt_files/all_models_file.txt"
+all_years_file = "txt_files/all_years_file.txt"
+all_specs_file = "txt_files/all_specs_file.txt"
 
 # Async fetch for some super fast data minin'
 async def asyncfetch(session, url, sem):
@@ -68,7 +70,6 @@ async def async_fetch_all(session, urls, sem):
     logging.info("async_fetch_all: %s %s %s", session, urls, sem)
     results = await asyncio.gather(*[asyncio.create_task(asyncfetch(session, url, sem))
                                      for url in urls])
-    #logging.info("async_fetch_all returning: %s", results)
     return results
 
 # Dump to file function
@@ -94,7 +95,6 @@ def all_makes():
         all_makes_list = readFromfile(all_makes_file)
         if (len(all_makes_list) != 0):
             logging.info("Found all_makes_list, with %s Car Makes inside it", len(all_makes_list))
-            logging.info("all_makes_list: %s", all_makes_list)
             return all_makes_list
         
     except Exception as e:
@@ -122,8 +122,6 @@ def all_makes():
 #  Format: https://www.thecarconnection.com/cars/toyota_corolla
 # Appears to be *432* of these
 async def all_models():
-
-    logging.critical("all_makes_list: %s", all_makes_list)
 
     # Don't overwhelm aiohttp!
     # 10 Requests *at most* at a time
@@ -248,7 +246,6 @@ logging.critical("Collected all Makes successfully")
 # Now caching the models list
 try:
     all_models_list = readFromfile(all_models_file)
-    logging.info("Found this inside the all_models_file: %s", all_models_list)
 
     if (len(all_makes_list) != 0):
         logging.info("Found all_models_file, with %s Car Models inside it", len(all_models_list))
@@ -264,12 +261,29 @@ except Exception as e:
 
 logging.critical("Collected all Models successfully")
 
-# Write the makes to a file with the same name for easy retrieval.
-logging.info("Car models list: %s", all_models_list)
+# Write the models to a file with the same name for easy retrieval.
 dump2file(all_models_file, all_models_list)
 
-#asyncio.run(all_years())
+# Now caching the years list
+try:
+    all_years_list = readFromfile(all_years_file)
+
+    if (len(all_years_list) != 0):
+        logging.info("Found all_years_file, with %s Car Models inside it", len(all_years_list))
+    else:
+        logging.error("all_years_file is empty, running scraper.py on it")
+        all_years_list = []
+        asyncio.run(all_years())
+    
+except Exception as e:
+    logging.error("Didn't find the all_models_file file, running scraper.py on it")
+    all_years_list = []
+    asyncio.run(all_years())
+
 logging.critical("Collected all Years successfully")
+
+# Write the years to a file with the same name for easy retrieval.
+dump2file(all_years_file, all_years_list)
 
 #asyncio.run(all_specs())
 logging.critical("Collected all Specs successfully")
