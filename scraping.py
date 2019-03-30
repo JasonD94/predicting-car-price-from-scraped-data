@@ -7,7 +7,8 @@ from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
 
 website = "https://www.thecarconnection.com"
-csvFile = "new_cars.csv"
+trimsCsvFile = "every_single_car.csv"
+dataCsvFile = "the_big_data.csv"
 
 print("************** Starting... **************")
 
@@ -40,17 +41,22 @@ def fetch(hostname, filename):
 all_makes_list = []     # Makes like Ford, Chevy
 all_models_list = []    # Make_Models like Toyota Corolla
 all_years_list = []     # Make_Model_Years like Toyota Corolla 2010
-year_model_overview_list = []
-trim_list = []
+all_specs_list = []     # Make_Model_Year_Spec like Toyota Corolla 2010 XYZ
+all_trims_list = []     # Make_Model_Year_Spec_Trim like Toyota Corolla 2010 XYZ ABC
 
 # Async fetch for some super fast data minin'
 async def asyncfetch(session, url):
-    async with session.get(url) as response:
-        if response.status != 200:
-            response.raise_for_status()
-            logging.critical("Failed to get async request!")
-        logging.debug("Got response for: %s", url)
-        return await response.text()
+    try:
+        timeout = aiohttp.ClientTimeout(total=120)
+        async with session.get(url, timeout=timeout) as response:
+            if response.status != 200:
+                response.raise_for_status()
+                logging.critical("Failed to get async request!")
+            logging.debug("Got response for: %s", url)
+            return await response.text()
+    except Exception as e:
+        logging.error('exception: %s %s', type(e), str(e))
+        return
 
 # Async gather - give it a session, and a list of URLs, fetches everything and returns it
 async def async_fetch_all(session, urls):
@@ -65,25 +71,20 @@ async def async_fetch_all(session, urls):
 def all_makes():
 
     # Now caching the makes list
-    if (len(all_makes_list) == 0):
+    for a in fetch(website, "/new-cars").find_all("a", {"class": "add-zip"}):
+        all_makes_list.append(website + a['href'])
+        # Ex: Found Car Make: /make/new,toyota
+        # <a class="add-zip " href="/make/new,toyota" title="Toyota">Toyota</a>
+        logging.debug("Found Car Make: %s", a['href'])
 
-        for a in fetch(website, "/new-cars").find_all("a", {"class": "add-zip"}):
-            all_makes_list.append(website + a['href'])
-            # Ex: Found Car Make: /make/new,toyota
-            # <a class="add-zip " href="/make/new,toyota" title="Toyota">Toyota</a>
-            logging.debug("Found Car Make: %s", a['href'])
-
-        # Log how many makes we found with a different level so we can easily find it later
-        logging.info("Found %s Car Makes", len(all_makes_list))
-
-    logging.info("Returning all_makes_list")
-    return all_makes_list
+    # Log how many makes we found with a different level so we can easily find it later
+    logging.info("Found %s Car Makes", len(all_makes_list))
 
 # Grabs each model for a given make
 # Example: Toyota Corolla
 #  Format: https://www.thecarconnection.com/cars/toyota_corolla
 # Appears to be *432* of these
-async def all_make_models():
+async def all_models():
 
     # Trying some async Python for looping to make this go super quick (hopefully)
     # Results: 5 seconds quicker for this call.
@@ -103,13 +104,12 @@ async def all_make_models():
 
     # Log how many Make/Model combos we find
     logging.info("Found %s Make & Model Combinations", len(all_models_list))
-    return all_models_list
 
 # Grabs all the years for every given make/model combination
 # Example: 2010 Toyota Corolla
 #  Format: https://www.thecarconnection.com/overview/toyota_corolla_2010
 # Appears to be *3931* of these
-async def all_make_model_years():
+async def all_years():
 
     # Async call to get all make/model/year combos (3931 of these!)
     # Results: 
@@ -120,14 +120,14 @@ async def all_make_model_years():
         soup = BeautifulSoup(year, 'html.parser')
 
         for div in soup.find_all("a", {"class": "btn avail-now first-item"}):
-            all_years_list.append(div['href'])
+            all_years_list.append(website + div['href'])
             # I think this gets the current model year, such as:
             # <a class="btn avail-now 1" href="/overview/toyota_corolla_2019" title="2019 Toyota Corolla Review">2019</a>
             # Which would be "2019"
             logging.debug("Current Model Year: %s", div['href'])
             
         for div in soup.find_all("a", {"class": "btn 1"}):
-            all_years_list.append(div['href'])
+            all_years_list.append(website + div['href'])
             # Seems like this gets each additional Model Year, such as:
             # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
             # Which would be "2018"
@@ -135,71 +135,75 @@ async def all_make_model_years():
 
     # Log how many Make/Model/Years combos we find
     logging.info("Found %s Make/Model/Year Combinations", len(all_years_list))
-    return all_years_list
 
 # Specs for each Make + Model + Year?
 # TBD
-def all_make_model_years_specs():
+async def all_specs():
 
-    # Cache all the data!1!!
-    if(len(year_model_overview_list) == 0):
-        for make in all_make_model_years():
-            for id in fetch(website, make).find_all("a", {"id": "ymm-nav-specs-btn"}):
-                # Pretty sure year_model_overview() needs to be year_model_overview_list,
-                # otherwise we're going to have some infinite recursion with my optimizations
-                year_model_overview_list.append(id['href'])
-                logging.debug("year_model_overview: %s", id['href'])
-        year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
+    # Async call to get all the specs for every make/model/year combo
+    async with aiohttp.ClientSession() as session:
+        results = await async_fetch_all(session, all_years_list)
 
-        # Log how many of these combos we find
-        logging.info("Found %s Make/Model/Year/Spec Combinations", len(year_model_overview_list))
+    for spec in results:
+        soup = BeautifulSoup(spec, 'html.parser')
 
-    logging.info("Returning year_model_overview_list")
-    return year_model_overview_list
+        for id in soup.find_all("a", {"id": "ymm-nav-specs-btn"}):
+            # Pretty sure year_model_overview() needs to be year_model_overview_list,
+            # otherwise we're going to have some infinite recursion with my optimizations
+            all_specs_list.append(website + id['href'])
+            logging.debug("year_model_overview: %s", id['href'])
+    
+    # Log how many of these combos we find
+    logging.info("Found %s Make/Model/Year/Spec Combinations", len(all_specs_list))
 
 # This must be all the trims for a given Make/Model/Year, like:
 # TBD
-def trims():
+async def all_trims():
     
-    logging.info("Trims Time")
+    # GATHER ALL THE TRIMS >:)
+    async with aiohttp.ClientSession() as session:
+        results = await async_fetch_all(session, all_specs_list)
 
-    if(len(trim_list) == 0):
-        for row in all_make_model_years_specs():
-            div = fetch(website, row).find_all("div", {"class": "block-inner"})[-1]
-            div_a = div.find_all("a")
-            logging.debug("Trims div: %s", div)
-            logging.debug("Trims div_a: %s", div_a)
-            for i in range(len(div_a)):
-                trim_list.append(div_a[-i]['href'])
-                logging.debug("i in range(len(div_a)): %s", div_a[-i]['href'])
+    for trim in results:
+        soup = BeautifulSoup(trim, 'html.parser')
+        
+        div = soup.find_all("div", {"class": "block-inner"})[-1]
+        div_a = div.find_all("a")
+        logging.debug("Trims div: %s", div)
+        logging.debug("Trims div_a: %s", div_a)
+        for i in range(len(div_a)):
+            all_trims_list.append(div_a[-i]['href'])
+            logging.debug("i in range(len(div_a)): %s", div_a[-i]['href'])
 
-        # Log how many of these combos we find
-        logging.info("Found %s Make/Model/Year/Trim Combinations", len(trim_list))
-
-    logging.info("Returning trim_list")
-    return trim_list
+    # Log how many of these combos we find
+    logging.info("Found %s Make/Model/Year/Trim Combinations", len(all_trims_list))
 
 logging.info("Starting scraping.py ...")
 
-# Should be able to make some optimizations to gather all the data we need at once
-# Like get all the makes, then fire off all the make_models
-# When that completes, fire off all the make_model_years
-# And when that's done, gather all the specs for make_model_year_specs
-# Finally, ALL trims for every single make_model_year_specs
-all_makes_list = all_makes()
-all_models_list = asyncio.run(all_make_models())
+# Optimized as much as I could out of this
+# Order is:
+# 1. Gather all Makes (Ford/Chevy/etc)
+# 2. For each Make, gather all Models (Corolla, F150, etc)
+# 3. For every Make/Model, gather all Years (2010, 2011, etc)
+# 4. For every Make/Model/Year, gather all Specs
+# 5. For every Make/Model/Year/Spec, gather all Trims
+all_makes()
+logging.critical("Collected all Makes successfully")
 
-logging.critical("Wow made it through all the make and models!")
+asyncio.run(all_models())
+logging.critical("Collected all Models successfully")
 
-all_years_list = asyncio.run(all_make_model_years())
+asyncio.run(all_years())
+logging.critical("Collected all Years successfully")
 
-logging.critical("Holy shit made it through all make model years!")
+asyncio.run(all_specs())
+logging.critical("Collected all Specs successfully")
+#all_specs_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
 
-#model_menu_list = all_make_model_years()
-#year_model_overview_list = all_make_model_years_specs()
-#trim_list = trims()
+asyncio.run(all_trims())
+logging.critical("Collected all Trims successfully")
 
-pd.DataFrame(trims()).to_csv(csvFile, index=False, header=None)
+pd.DataFrame(all_trims_list).to_csv(trimsCsvFile, index=False, header=None)
 
 logging.info("Scrapping **DONE**")
 trims = pd.read_csv(csvFile)
@@ -207,6 +211,7 @@ trims = pd.read_csv(csvFile)
 # This must grab specs for everything, looks like price + MSRP
 def specifications():
     specifications_table = pd.DataFrame()
+    
     for row in trims.iloc[:, 0]:
         soup = fetch(website, row)
         specifications_df = pd.DataFrame(columns=[soup.find_all("title")[0].text[:-15]])
@@ -221,4 +226,4 @@ def specifications():
     return specifications_table
 
 logging.info("Specifications time...")
-specifications().to_csv(csvFile)
+specifications().to_csv(dataCsvFile)
