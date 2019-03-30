@@ -32,20 +32,30 @@ logging.info('This will get logged to a file called scrapping.log')
 def fetch(hostname, filename):
     return bs.BeautifulSoup(urlopen(Request(hostname + filename, headers={'User-Agent': 'X'})).read(), 'lxml')
 
+# Code seems to be repeatedly calling out to the CarConnection website. No wonder it takes 8 hours to run currently...
+# Instead, let's cache the basics like Makes & Models to speed this up.
+all_makes_list = []
+make_menu_list = []
+model_menu_list = []
+year_model_overview_list = []
+trim_list = []
+
 # Grabs all the Makes on https://www.thecarconnection.com/new-cars
 # Example: Ford, Chrysler, Toyota, etc
 #  Format: https://www.thecarconnection.com//make/new,toyota
 # Appears to be 43 of these
 def all_makes():
-    all_makes_list = []
-    for a in fetch(website, "/new-cars").find_all("a", {"class": "add-zip"}):
-        all_makes_list.append(a['href'])
-        # Ex: Found Car Make: /make/new,toyota
-        # <a class="add-zip " href="/make/new,toyota" title="Toyota">Toyota</a>
-        logging.debug("Found Car Make: %s", a['href'])
 
-    # Log how many makes we found with a different level so we can easily find it later
-    logging.info("Found %s Car Makes", len(all_makes_list))
+    # Now caching the makes list
+    if (len(all_makes_list) == 0):
+        for a in fetch(website, "/new-cars").find_all("a", {"class": "add-zip"}):
+            all_makes_list.append(a['href'])
+            # Ex: Found Car Make: /make/new,toyota
+            # <a class="add-zip " href="/make/new,toyota" title="Toyota">Toyota</a>
+            logging.debug("Found Car Make: %s", a['href'])
+
+        # Log how many makes we found with a different level so we can easily find it later
+        logging.info("Found %s Car Makes", len(all_makes_list))
     
     return all_makes_list
 
@@ -54,16 +64,18 @@ def all_makes():
 #  Format: https://www.thecarconnection.com/cars/toyota_corolla
 # Appears to be *432* of these
 def make_menu():
-    make_menu_list = []
-    for make in all_makes():
-        for div in fetch(website, make).find_all("div", {"class": "name"}):
-            make_menu_list.append(div.find_all("a")[0]['href'])
-            # Ex: Found Model for /make/new,toyota: /cars/toyota_corolla
-            # <a href="/cars/toyota_corolla">Toyota Corolla</a>
-            logging.debug("Found Model for %s: %s", make, div.find_all("a")[0]['href'])
 
-    # Log how many Make/Model combos we find
-    logging.info("Found %s Make & Model Combinations", len(make_menu_list))
+    # Now caching Make_Models list
+    if (len(make_menu_list) == 0):
+        for make in all_makes():
+            for div in fetch(website, make).find_all("div", {"class": "name"}):
+                make_menu_list.append(div.find_all("a")[0]['href'])
+                # Ex: Found Model for /make/new,toyota: /cars/toyota_corolla
+                # <a href="/cars/toyota_corolla">Toyota Corolla</a>
+                logging.debug("Found Model for %s: %s", make, div.find_all("a")[0]['href'])
+
+        # Log how many Make/Model combos we find
+        logging.info("Found %s Make & Model Combinations", len(make_menu_list))
     
     return make_menu_list
 
@@ -72,57 +84,64 @@ def make_menu():
 #  Format: https://www.thecarconnection.com/overview/toyota_corolla_2010
 # TBD how many of these there are
 def model_menu():
-    model_menu_list = []
-    for make in make_menu():
-        soup = fetch(website, make)
-        for div in soup.find_all("a", {"class": "btn avail-now first-item"}):
-            model_menu_list.append(div['href'])
-            # I think this gets the current model year, such as:
-            # <a class="btn avail-now 1" href="/overview/toyota_corolla_2019" title="2019 Toyota Corolla Review">2019</a>
-            # Which would be "2019"
-            logging.debug("Current Model Year: %s", div['href'])
-        for div in soup.find_all("a", {"class": "btn 1"}):
-            model_menu_list.append(div['href'])
-            # Seems like this gets each additional Model Year, such as:
-            # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
-            # Which would be "2018"
-            logging.debug("Additional Model Years: %s", div['href'])
 
-    # Log how many Make/Model/Years combos we find
-    logging.info("Found %s Make/Model/Year Combinations", len(model_menu_list))
+    # Caching the Make_Models_Years list
+    if(len(model_menu_list) == 0):
+        for make in make_menu():
+            soup = fetch(website, make)
+            for div in soup.find_all("a", {"class": "btn avail-now first-item"}):
+                model_menu_list.append(div['href'])
+                # I think this gets the current model year, such as:
+                # <a class="btn avail-now 1" href="/overview/toyota_corolla_2019" title="2019 Toyota Corolla Review">2019</a>
+                # Which would be "2019"
+                logging.debug("Current Model Year: %s", div['href'])
+            for div in soup.find_all("a", {"class": "btn 1"}):
+                model_menu_list.append(div['href'])
+                # Seems like this gets each additional Model Year, such as:
+                # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
+                # Which would be "2018"
+                logging.debug("Additional Model Years: %s", div['href'])
+
+        # Log how many Make/Model/Years combos we find
+        logging.info("Found %s Make/Model/Year Combinations", len(model_menu_list))
     
     return model_menu_list
 
 # Specs for each Make + Model + Year?
 # TBD
 def year_model_overview():
-    year_model_overview_list = []
-    for make in model_menu():
-        for id in fetch(website, make).find_all("a", {"id": "ymm-nav-specs-btn"}):
-            year_model_overview().append(id['href'])
-            logging.debug("year_model_overview: %s", id['href'])
-    year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
 
-    # Log how many of these combos we find
-    logging.info("Found %s Make/Model/Year/Spec Combinations", len(year_model_overview_list))
+    # Cache all the data!1!!
+    if(len(year_model_overview_list) == 0):
+        for make in model_menu():
+            for id in fetch(website, make).find_all("a", {"id": "ymm-nav-specs-btn"}):
+                year_model_overview().append(id['href'])
+                logging.debug("year_model_overview: %s", id['href'])
+        year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
+
+        # Log how many of these combos we find
+        logging.info("Found %s Make/Model/Year/Spec Combinations", len(year_model_overview_list))
     
     return year_model_overview_list
 
-# This must be all the trims for a given Model Year, like:
+# This must be all the trims for a given Make/Model/Year, like:
 # TBD
 def trims():
-    trim_list = []
+    
     logging.info("Trims Time")
-    for row in year_model_overview():
-        div = fetch(website, row).find_all("div", {"class": "block-inner"})[-1]
-        div_a = div.find_all("a")
-        logging.info("Trims div: %s", div)
-        logging.info("Trims div_a: %s", div_a)
-        for i in range(len(div_a)):
-            trim_list.append(div_a[-i]['href'])
-            logging.info("i in range(len(div_a)): %s", div_a[-i]['href'])
 
-    # Log how many of these combos we find
+    if(len(trim_list) == 0):
+        for row in year_model_overview():
+            div = fetch(website, row).find_all("div", {"class": "block-inner"})[-1]
+            div_a = div.find_all("a")
+            logging.info("Trims div: %s", div)
+            logging.info("Trims div_a: %s", div_a)
+            for i in range(len(div_a)):
+                trim_list.append(div_a[-i]['href'])
+                logging.info("i in range(len(div_a)): %s", div_a[-i]['href'])
+
+        # Log how many of these combos we find
+        logging.info("Found %s Make/Model/Year/Trim Combinations", len(trim_list))
             
     return trim_list
 
