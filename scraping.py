@@ -334,7 +334,7 @@ all_trims_list = try2readfile("all_trims_list", all_trims_list, all_trims_file, 
 pd.DataFrame(all_trims_list).to_csv(trimsCsvFile, index=False, header=None)
 
 logging.info("Scrapping **DONE**")
-#trims = pd.read_csv(csvFile)
+trims = pd.read_csv(csvFile)
 
 # This must grab specs for everything, looks like price + MSRP
 def specifications():

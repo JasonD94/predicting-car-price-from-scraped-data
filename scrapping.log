@@ -1,0 +1,16 @@
+03-30-19T14:24:42 - INFO - ************** Starting... **************
+03-30-19T14:24:42 - INFO - This will get logged to a file called scrapping.log
+03-30-19T14:24:42 - INFO - Starting scraping.py ...
+03-30-19T14:24:42 - INFO - Found all_makes_list, with 43 Car Makes inside it
+03-30-19T14:24:42 - CRITICAL - Collected all Makes successfully
+03-30-19T14:24:42 - INFO - Found all_models_list, with 432 entries
+03-30-19T14:24:42 - CRITICAL - Collected all all_models_list successfully
+03-30-19T14:24:42 - INFO - Size of all_models_list: 432
+03-30-19T14:24:42 - INFO - Found all_years_list, with 3931 entries
+03-30-19T14:24:42 - CRITICAL - Collected all all_years_list successfully
+03-30-19T14:24:42 - INFO - Found all_specs_list, with 3812 entries
+03-30-19T14:24:42 - CRITICAL - Collected all all_specs_list successfully
+03-30-19T14:24:42 - INFO - Found all_trims_list, with 32321 entries
+03-30-19T14:24:42 - CRITICAL - Collected all all_trims_list successfully
+03-30-19T14:24:42 - INFO - Scrapping **DONE**
+03-30-19T14:24:42 - INFO - Specifications time...
