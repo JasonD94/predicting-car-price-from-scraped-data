@@ -3,6 +3,7 @@ import bs4 as bs
 import pandas as pd
 import aiohttp
 import asyncio
+import pickle
 from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
 
@@ -44,12 +45,15 @@ all_years_list = []     # Make_Model_Years like Toyota Corolla 2010
 all_specs_list = []     # Make_Model_Year_Spec like Toyota Corolla 2010 XYZ
 all_trims_list = []     # Make_Model_Year_Spec_Trim like Toyota Corolla 2010 XYZ ABC
 
+# File Names for storing to & pulling from for future runs
+all_makes_file = "txt_files/all_makes_file.txt"
+all_models_file = "txt_files/all_models_file.txt"
+
 # Async fetch for some super fast data minin'
 async def asyncfetch(session, url, sem):
     try:
         async with sem:
-            timeout = aiohttp.ClientTimeout(total=120)
-            async with session.get(url, timeout=timeout) as response:
+            async with session.get(url) as response:
                 if response.status != 200:
                     response.raise_for_status()
                     logging.critical("Failed to get async request!")
@@ -61,9 +65,23 @@ async def asyncfetch(session, url, sem):
 
 # Async gather - give it a session, and a list of URLs, fetches everything and returns it
 async def async_fetch_all(session, urls, sem):
+    logging.info("async_fetch_all: %s %s %s", session, urls, sem)
     results = await asyncio.gather(*[asyncio.create_task(asyncfetch(session, url, sem))
                                      for url in urls])
+    #logging.info("async_fetch_all returning: %s", results)
     return results
+
+# Dump to file function
+def dump2file(file_name, list_arr):
+    with open(file_name, 'wb') as f:
+        pickle.dump(list_arr, f)
+
+def readFromfile(file_name):
+    with open(file_name, 'rb') as f:
+        list_arr = pickle.load(f)
+        return list_arr
+
+# Read from file function
 
 # Grabs all the Makes on https://www.thecarconnection.com/new-cars
 # Example: Ford, Chrysler, Toyota, etc
@@ -72,6 +90,18 @@ async def async_fetch_all(session, urls, sem):
 def all_makes():
 
     # Now caching the makes list
+    try:
+        all_makes_list = readFromfile(all_makes_file)
+        if (len(all_makes_list) != 0):
+            logging.info("Found all_makes_list, with %s Car Makes inside it", len(all_makes_list))
+            logging.info("all_makes_list: %s", all_makes_list)
+            return all_makes_list
+        
+    except Exception as e:
+        logging.error("Didn't find the all_makes_list file, running scraper.py on it")
+        all_makes_list = []
+   
+    # If we didn't find the cache list, bombs away
     for a in fetch(website, "/new-cars").find_all("a", {"class": "add-zip"}):
         all_makes_list.append(website + a['href'])
         # Ex: Found Car Make: /make/new,toyota
@@ -81,11 +111,19 @@ def all_makes():
     # Log how many makes we found with a different level so we can easily find it later
     logging.info("Found %s Car Makes", len(all_makes_list))
 
+    # Write the makes to a file with the same name for easy retrieval.
+    logging.info("Car makes list: %s", all_makes_list)
+    dump2file(all_makes_file, all_makes_list)
+
+    return all_makes_list
+
 # Grabs each model for a given make
 # Example: Toyota Corolla
 #  Format: https://www.thecarconnection.com/cars/toyota_corolla
 # Appears to be *432* of these
 async def all_models():
+
+    logging.critical("all_makes_list: %s", all_makes_list)
 
     # Don't overwhelm aiohttp!
     # 10 Requests *at most* at a time
@@ -147,7 +185,7 @@ async def all_years():
     # Log how many Make/Model/Years combos we find
     logging.info("Found %s Make/Model/Year Combinations", len(all_years_list))
 
-# Specs for each Make + Model + Year?
+# Specs for each Make + Model + Year
 # TBD
 async def all_specs():
 
@@ -158,7 +196,8 @@ async def all_specs():
 
     # Async call to get all the specs for every make/model/year combo
     async with aiohttp.ClientSession() as session:
-        results = await async_fetch_all(session, all_years_list, sem)
+        # ALL_COMPLETED == don't return until every single make_model_year is found
+        results = await asyncio.wait(async_fetch_all(session, all_years_list, sem), return_when=ALL_COMPLETED)
 
     for spec in results:
         soup = BeautifulSoup(spec, 'html.parser')
@@ -172,7 +211,7 @@ async def all_specs():
     # Log how many of these combos we find
     logging.info("Found %s Make/Model/Year/Spec Combinations", len(all_specs_list))
 
-# This must be all the trims for a given Make/Model/Year, like:
+# This must be all the trims for a given Make/Model/Year/Spec
 # TBD
 async def all_trims():
     
@@ -203,16 +242,36 @@ logging.info("Starting scraping.py ...")
 # 3. For every Make/Model, gather all Years (2010, 2011, etc)
 # 4. For every Make/Model/Year, gather all Specs
 # 5. For every Make/Model/Year/Spec, gather all Trims
-all_makes()
+all_makes_list = all_makes()
 logging.critical("Collected all Makes successfully")
 
-asyncio.run(all_models())
+# Now caching the models list
+try:
+    all_models_list = readFromfile(all_models_file)
+    logging.info("Found this inside the all_models_file: %s", all_models_list)
+
+    if (len(all_makes_list) != 0):
+        logging.info("Found all_models_file, with %s Car Models inside it", len(all_models_list))
+    else:
+        logging.error("all_models_file is empty, running scraper.py on it")
+        all_models_list = []
+        asyncio.run(all_models())
+    
+except Exception as e:
+    logging.error("Didn't find the all_models_file file, running scraper.py on it")
+    all_models_list = []
+    asyncio.run(all_models())
+
 logging.critical("Collected all Models successfully")
 
-asyncio.run(all_years())
+# Write the makes to a file with the same name for easy retrieval.
+logging.info("Car models list: %s", all_models_list)
+dump2file(all_models_file, all_models_list)
+
+#asyncio.run(all_years())
 logging.critical("Collected all Years successfully")
 
-asyncio.run(all_specs())
+#asyncio.run(all_specs())
 logging.critical("Collected all Specs successfully")
 #all_specs_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
 
@@ -222,7 +281,7 @@ logging.critical("Collected all Trims successfully")
 pd.DataFrame(all_trims_list).to_csv(trimsCsvFile, index=False, header=None)
 
 logging.info("Scrapping **DONE**")
-trims = pd.read_csv(csvFile)
+#trims = pd.read_csv(csvFile)
 
 # This must grab specs for everything, looks like price + MSRP
 def specifications():
