@@ -48,6 +48,7 @@ def all_makes():
 
     # Now caching the makes list
     if (len(all_makes_list) == 0):
+        
         for a in fetch(website, "/new-cars").find_all("a", {"class": "add-zip"}):
             all_makes_list.append(a['href'])
             # Ex: Found Car Make: /make/new,toyota
@@ -64,7 +65,7 @@ def all_makes():
 # Example: Toyota Corolla
 #  Format: https://www.thecarconnection.com/cars/toyota_corolla
 # Appears to be *432* of these
-def make_menu():
+def all_make_models():
 
     # Now caching Make_Models list
     if (len(make_menu_list) == 0):
@@ -85,11 +86,11 @@ def make_menu():
 # Example: 2010 Toyota Corolla
 #  Format: https://www.thecarconnection.com/overview/toyota_corolla_2010
 # Appears to be *3931* of these
-def model_menu():
+def all_make_model_years():
 
     # Caching the Make_Models_Years list
     if(len(model_menu_list) == 0):
-        for make in make_menu():
+        for make in all_make_models():
             soup = fetch(website, make)
             for div in soup.find_all("a", {"class": "btn avail-now first-item"}):
                 model_menu_list.append(div['href'])
@@ -112,11 +113,11 @@ def model_menu():
 
 # Specs for each Make + Model + Year?
 # TBD
-def year_model_overview():
+def all_make_model_years_specs():
 
     # Cache all the data!1!!
     if(len(year_model_overview_list) == 0):
-        for make in model_menu():
+        for make in all_make_model_years():
             for id in fetch(website, make).find_all("a", {"id": "ymm-nav-specs-btn"}):
                 # Pretty sure year_model_overview() needs to be year_model_overview_list,
                 # otherwise we're going to have some infinite recursion with my optimizations
@@ -137,7 +138,7 @@ def trims():
     logging.info("Trims Time")
 
     if(len(trim_list) == 0):
-        for row in year_model_overview():
+        for row in all_make_model_years_specs():
             div = fetch(website, row).find_all("div", {"class": "block-inner"})[-1]
             div_a = div.find_all("a")
             logging.debug("Trims div: %s", div)
@@ -153,6 +154,18 @@ def trims():
     return trim_list
 
 logging.info("Starting scraping.py ...")
+
+# Should be able to make some optimizations to gather all the data we need at once
+# Like get all the makes, then fire off all the make_models
+# When that completes, fire off all the make_model_years
+# And when that's done, gather all the specs for make_model_year_specs
+# Finally, ALL trims for every single make_model_year_specs
+#all_makes_list = all_makes()
+#make_menu_list = all_make_models()
+#model_menu_list = all_make_model_years()
+#year_model_overview_list = all_make_model_years_specs()
+#trim_list = trims()
+
 pd.DataFrame(trims()).to_csv(csvFile, index=False, header=None)
 
 logging.info("Scrapping **DONE**")
