@@ -54,6 +54,6 @@ an IDE like [IDLE](https://docs.python.org/3/library/idle.html). The scraping
 script takes a while to run, so give it a chance to run.
 
 ## *Random Note:* an IDLE Dark Mode Theme
-Place [config-highlight.cfg](./config-highlight.cfg) inside **~HOMEDIR~**/.idlerc/ and go to 
+Place [config-highlight.cfg](./config-highlight.cfg) inside **HOMEDIR**/.idlerc/ and go to 
 Options → Configure IDLE → Highlights and switch on the "Custom Theme" 
 (should default to Custom Dark), hit apply to turn it on.

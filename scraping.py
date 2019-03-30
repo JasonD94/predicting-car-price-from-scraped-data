@@ -56,7 +56,8 @@ def all_makes():
 
         # Log how many makes we found with a different level so we can easily find it later
         logging.info("Found %s Car Makes", len(all_makes_list))
-    
+
+    logging.info("Returning all_makes_list")
     return all_makes_list
 
 # Grabs each model for a given make
@@ -76,13 +77,14 @@ def make_menu():
 
         # Log how many Make/Model combos we find
         logging.info("Found %s Make & Model Combinations", len(make_menu_list))
-    
+
+    logging.info("Returning make_menu_list")
     return make_menu_list
 
 # Grabs all the years for every given make/model combination
 # Example: 2010 Toyota Corolla
 #  Format: https://www.thecarconnection.com/overview/toyota_corolla_2010
-# TBD how many of these there are
+# Appears to be *3931* of these
 def model_menu():
 
     # Caching the Make_Models_Years list
@@ -104,7 +106,8 @@ def model_menu():
 
         # Log how many Make/Model/Years combos we find
         logging.info("Found %s Make/Model/Year Combinations", len(model_menu_list))
-    
+
+    logging.info("Returning model_menu_list")
     return model_menu_list
 
 # Specs for each Make + Model + Year?
@@ -115,13 +118,16 @@ def year_model_overview():
     if(len(year_model_overview_list) == 0):
         for make in model_menu():
             for id in fetch(website, make).find_all("a", {"id": "ymm-nav-specs-btn"}):
-                year_model_overview().append(id['href'])
+                # Pretty sure year_model_overview() needs to be year_model_overview_list,
+                # otherwise we're going to have some infinite recursion with my optimizations
+                year_model_overview_list.append(id['href'])
                 logging.debug("year_model_overview: %s", id['href'])
         year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
 
         # Log how many of these combos we find
         logging.info("Found %s Make/Model/Year/Spec Combinations", len(year_model_overview_list))
-    
+
+    logging.info("Returning year_model_overview_list")
     return year_model_overview_list
 
 # This must be all the trims for a given Make/Model/Year, like:
@@ -134,15 +140,16 @@ def trims():
         for row in year_model_overview():
             div = fetch(website, row).find_all("div", {"class": "block-inner"})[-1]
             div_a = div.find_all("a")
-            logging.info("Trims div: %s", div)
-            logging.info("Trims div_a: %s", div_a)
+            logging.debug("Trims div: %s", div)
+            logging.debug("Trims div_a: %s", div_a)
             for i in range(len(div_a)):
                 trim_list.append(div_a[-i]['href'])
-                logging.info("i in range(len(div_a)): %s", div_a[-i]['href'])
+                logging.debug("i in range(len(div_a)): %s", div_a[-i]['href'])
 
         # Log how many of these combos we find
         logging.info("Found %s Make/Model/Year/Trim Combinations", len(trim_list))
-            
+
+    logging.info("Returning trim_list")
     return trim_list
 
 logging.info("Starting scraping.py ...")
