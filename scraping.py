@@ -256,7 +256,7 @@ async def all_specs():
     dump2file(all_specs_file, all_specs_list)
 
 # This must be all the trims for a given Make/Model/Year/Spec
-# TBD how many we find
+# Turns out there's ~32321 Make/Model/Year/Trim Combinations! Jeez.
 async def all_trims():
 
     # Same as all_specs(), this has ~3800 URLs to hit so limit of 4 concurrent requests
@@ -270,30 +270,34 @@ async def all_trims():
     # Seems like 3812 URLs can cause the await to not really wait... so check for empty lists first
     if results:
         for trim in results:
-            soup = BeautifulSoup(trim, 'html.parser')
-            
-            div = soup.find_all("div", {"class": "block-inner"})[-1]
-            div_a = div.find_all("a")
-            logging.debug("Trims div: %s", div)
-            logging.debug("Trims div_a: %s", div_a)
+            if trim:
+                soup = BeautifulSoup(trim, 'html.parser')
+                
+                div = soup.find_all("div", {"class": "block-inner"})[-1]
+                div_a = div.find_all("a")
+                logging.debug("Trims div: %s", div)
+                logging.debug("Trims div_a: %s", div_a)
 
-            #
-            # Ran into an exception on the len(div_a) call. I think the original code this is based on
-            # must have ran into the same problem, based on the following snippet of code I spotted:
-            # year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
-            # The exception I saw happened around here at this make_model_year_spec:
-            # /specifications/buick_encore_2013_awd-4dr-convenience
-            #
-            # Since it's possible for this to happen anywhere if the pages aren't 100% the same setup,
-            # we should wrap this in a try/except and log any weird errors we run into.
-            try:
-                for i in range(len(div_a)):
-                    all_trims_list.append(div_a[-i]['href'])
-                    logging.debug("i in range(len(div_a)): %s", div_a[-i]['href'])
+                #
+                # Ran into an exception on the len(div_a) call. I think the original code this is based on
+                # must have ran into the same problem, based on the following snippet of code I spotted:
+                # year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
+                # The exception I saw happened around here at this make_model_year_spec:
+                # /specifications/buick_encore_2013_awd-4dr-convenience
+                #
+                # Since it's possible for this to happen anywhere if the pages aren't 100% the same setup,
+                # we should wrap this in a try/except and log any weird errors we run into.
+                try:
+                    for i in range(len(div_a)):
+                        all_trims_list.append(div_a[-i]['href'])
+                        logging.debug("i in range(len(div_a)): %s", div_a[-i]['href'])
 
-            except Exception as e:
-                logging.error('all_trims exception at for i in range(len(div_a)): %s %s', type(e), str(e))
-                return
+                except Exception as e:
+                    logging.error('all_trims exception at for i in range(len(div_a)): %s %s', type(e), str(e))
+                    return
+            else:
+                # Actually, seems like one of the trims might just be coming back as null for some reason...
+                logging.error("found a null trim: %s", trim)
 
     # Log how many of these trim combos we find
     logging.info("Found %s Make/Model/Year/Trim Combinations", len(all_trims_list))
