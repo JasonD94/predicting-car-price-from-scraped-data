@@ -3,7 +3,20 @@ Scraping data from [The Car Connection](https://www.thecarconnection.com)
 
 Original repo forked from [nicolas-gervais/predicting-car-price-from-scraped-data](https://github.com/nicolas-gervais/predicting-car-price-from-scraped-data)
 
-Modifying to scrap the used car section
+Original Reddit post:
+ 
+[I scraped 32,000 cars, including the price and 115 specifications](https://www.reddit.com/r/datasets/comments/b6rcwv/i_scraped_32000_cars_including_the_price_and_115/)
+
+From the 
+[/r/datasets](https://www.reddit.com/r/datasets/) subreddit
+
+Modifying the [scraping.py](./scraping.py) Python Script to scrap the used 
+car section, plus optimizing it using some async libraries like 
+[aiohttp](https://aiohttp.readthedocs.io/en/stable/) and 
+[asyncio](https://docs.python.org/3/library/asyncio.html).
+Also using [pickle](https://docs.python.org/3/library/pickle.html) 
+to store the results of each scrap so we don't need to repeatedly
+hit the same web pages multiple times.
 
 Really interested in gathering some data on Toyota Sedans in my area:
 [https://www.thecarconnection.com/inventory?make=toyota](https://www.thecarconnection.com/inventory?make=toyota)
@@ -49,11 +62,13 @@ which basically says to install lxml:
 pip install lxml
 ```
 
-4. My optimized version requires aiohttp to run parallel web requests:
+4. My async version requires aiohttp & asyncio to run parallel web requests:
 
 ```console
 pip install aiohttp
 ```
+
+[asyncio should be installed already, if not pip install it too]
 
 5. Run the [scraping.py](./scraping.py) scipt using Python in bash/cmd or with
 an IDE like [IDLE](https://docs.python.org/3/library/idle.html). The scraping

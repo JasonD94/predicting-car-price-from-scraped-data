@@ -17,6 +17,7 @@ all_makes_file = "txt_files/all_makes_file.txt"
 all_models_file = "txt_files/all_models_file.txt"
 all_years_file = "txt_files/all_years_file.txt"
 all_specs_file = "txt_files/all_specs_file.txt"
+all_trims_file = "txt_files/all_trims_file.txt"
 
 # Code seems to be repeatedly calling out to the CarConnection website. No wonder it takes 8 hours to run currently...
 # Instead, let's cache the basics like Makes & Models to speed this up.
@@ -25,8 +26,6 @@ all_models_list = []    # Make_Models like Toyota Corolla
 all_years_list = []     # Make_Model_Years like Toyota Corolla 2010
 all_specs_list = []     # Make_Model_Year_Spec like Toyota Corolla 2010 XYZ
 all_trims_list = []     # Make_Model_Year_Spec_Trim like Toyota Corolla 2010 XYZ ABC
-
-print("************** Starting... **************")
 
 # Some logging for scraping.py, to both understand the script better and have debug info if it crashes
 # or dies mid scrap. Logging is built into Python
@@ -49,6 +48,7 @@ console.setFormatter(formatter)
 logging.getLogger('').addHandler(console)
 
 # Logging should be working now
+logging.info("************** Starting... **************")
 logging.info('This will get logged to a file called scrapping.log')
 
 # Original fetch function
@@ -76,15 +76,38 @@ async def async_fetch_all(session, urls, sem):
                                      for url in urls], return_exceptions=True)
     return results
 
-# File IO functions
-def dump2file(file_name, list_arr):
-    with open(file_name, 'wb') as f:
-        pickle.dump(list_arr, f)
+# File IO functions - caching results of previous web scraps, so if we crash or timeout, or whatever
+# we won't have to grab the same data repeatedly. In the future, we can overwrite these files or
+# add an option to delete them if we want fresh data (perhaps a new model came out recently)
+# Also turning this into a function vs copy/pasting the same copy 4 times. :]
+def try2readfile(scrap_name, scrap_list, scrap_file, async_function):
+    # Now caching the models list
+    try:
+        scrap_list = readFromfile(scrap_file)
+
+        if (len(scrap_list) != 0):
+            logging.info("Found %s, with %s entries", scrap_name, len(scrap_list))
+        else:
+            logging.error("%s is empty, running web scraper", scrap_file)
+            scrap_list = []
+            asyncio.run(async_function())
+        
+    except Exception as e:
+        logging.error("Didn't find the %s file, running scraper", scrap_file)
+        scrap_list = []
+        asyncio.run(async_function())
+
+    logging.critical("Collected all %s successfully", scrap_name)
+    return scrap_list
 
 def readFromfile(file_name):
     with open(file_name, 'rb') as f:
         list_arr = pickle.load(f)
         return list_arr
+
+def dump2file(file_name, list_arr):
+    with open(file_name, 'wb') as f:
+        pickle.dump(list_arr, f)
 
 # Grabs all the Makes on https://www.thecarconnection.com/new-cars
 # Example: Ford, Chrysler, Toyota, etc
@@ -149,6 +172,9 @@ async def all_models():
     # Log how many Make/Model combos we find
     logging.info("Found %s Make & Model Combinations", len(all_models_list))
 
+    # Write the models to a file with the same name for easy retrieval.
+    dump2file(all_models_file, all_models_list)
+
 # Grabs all the years for every given make/model combination
 # Example: 2010 Toyota Corolla
 #  Format: https://www.thecarconnection.com/overview/toyota_corolla_2010
@@ -185,20 +211,26 @@ async def all_years():
     # Log how many Make/Model/Years combos we find
     logging.info("Found %s Make/Model/Year Combinations", len(all_years_list))
 
+    # Write the years to a file with the same name for easy retrieval.
+    dump2file(all_years_file, all_years_list)
+
 # Specs for each Make + Model + Year
 # TBD
 async def all_specs():
 
     # This call has ~3931 URLs, so we don't want to overwhelm aiohttp
-    # Will limit it to 10 connections at the same time, and make it wait til those respond.
+    # Will limit it to 4 connections at the same time, and make it wait til those respond.
     # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
-    sem = asyncio.Semaphore(2)
+    sem = asyncio.Semaphore(4)
 
     # Async call to get all the specs for every make/model/year combo
     async with aiohttp.ClientSession() as session:
         # This works, but may cause results to be empty. Need to investigate it more.
         results = await async_fetch_all(session, all_years_list, sem)
 
+        # TODO: Look more into this article
+        # https://hackernoon.com/threaded-asynchronous-magic-and-how-to-wield-it-bba9ed602c32
+        
         # This is tricky, if needed come back and try to get this working
         # https://docs.python.org/3/library/asyncio-task.html#running-tasks-concurrently
         # https://stackoverflow.com/questions/34509586/how-to-know-which-coroutines-were-done-with-asyncio-wait
@@ -219,6 +251,9 @@ async def all_specs():
     
     # Log how many of these combos we find
     logging.info("Found %s Make/Model/Year/Spec Combinations", len(all_specs_list))
+
+    # Write the specs to a file
+    dump2file(all_specs_file, all_specs_list)
 
 # This must be all the trims for a given Make/Model/Year/Spec
 # TBD
@@ -244,7 +279,7 @@ async def all_trims():
 
 logging.info("Starting scraping.py ...")
 
-# Optimized as much as I could out of this
+# Optimized as much as I could out of this. Async http & cache results to files.
 # Order is:
 # 1. Gather all Makes (Ford/Chevy/etc)
 # 2. For each Make, gather all Models (Corolla, F150, etc)
@@ -255,51 +290,16 @@ all_makes_list = all_makes()
 logging.critical("Collected all Makes successfully")
 
 # Now caching the models list
-try:
-    all_models_list = readFromfile(all_models_file)
-
-    if (len(all_makes_list) != 0):
-        logging.info("Found all_models_file, with %s Car Models inside it", len(all_models_list))
-    else:
-        logging.error("all_models_file is empty, running scraper.py on it")
-        all_models_list = []
-        asyncio.run(all_models())
-    
-except Exception as e:
-    logging.error("Didn't find the all_models_file file, running scraper.py on it")
-    all_models_list = []
-    asyncio.run(all_models())
-
-logging.critical("Collected all Models successfully")
-
-# Write the models to a file with the same name for easy retrieval.
-dump2file(all_models_file, all_models_list)
+all_models_list = try2readfile("all_models_list", all_models_list, all_models_file, all_models)
+logging.info("Size of all_models_list: %s", len(all_models_list))
 
 # Now caching the years list
-try:
-    all_years_list = readFromfile(all_years_file)
+all_years_list = try2readfile("all_years_list", all_years_list, all_years_file, all_years)
 
-    if (len(all_years_list) != 0):
-        logging.info("Found all_years_file, with %s Car Models inside it", len(all_years_list))
-    else:
-        logging.error("all_years_file is empty, running scraper.py on it")
-        all_years_list = []
-        asyncio.run(all_years())
-    
-except Exception as e:
-    logging.error("Didn't find the all_models_file file, running scraper.py on it")
-    all_years_list = []
-    asyncio.run(all_years())
+# Now caching the specs list
+all_specs_list = try2readfile("all_specs_list", all_specs_list, all_specs_file, all_specs)
 
-logging.critical("Collected all Years successfully")
-
-# Write the years to a file with the same name for easy retrieval.
-dump2file(all_years_file, all_years_list)
-
-asyncio.run(all_specs())
-logging.critical("Collected all Specs successfully")
-#all_specs_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
-
+# todo: trims
 #asyncio.run(all_trims())
 logging.critical("Collected all Trims successfully")
 
