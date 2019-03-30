@@ -8,8 +8,23 @@ from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
 
 website = "https://www.thecarconnection.com"
-trimsCsvFile = "every_single_car.csv"
-dataCsvFile = "the_big_data.csv"
+
+# File Names for storing to & pulling from for future runs
+trimsCsvFile = "csv/every_single_car.csv"
+dataCsvFile = "csv/the_big_data.csv"
+
+all_makes_file = "txt_files/all_makes_file.txt"
+all_models_file = "txt_files/all_models_file.txt"
+all_years_file = "txt_files/all_years_file.txt"
+all_specs_file = "txt_files/all_specs_file.txt"
+
+# Code seems to be repeatedly calling out to the CarConnection website. No wonder it takes 8 hours to run currently...
+# Instead, let's cache the basics like Makes & Models to speed this up.
+all_makes_list = []     # Makes like Ford, Chevy
+all_models_list = []    # Make_Models like Toyota Corolla
+all_years_list = []     # Make_Model_Years like Toyota Corolla 2010
+all_specs_list = []     # Make_Model_Year_Spec like Toyota Corolla 2010 XYZ
+all_trims_list = []     # Make_Model_Year_Spec_Trim like Toyota Corolla 2010 XYZ ABC
 
 print("************** Starting... **************")
 
@@ -26,30 +41,19 @@ logging.basicConfig(filename='scrapping.log',
 # https://stackoverflow.com/a/38613204
 console = logging.StreamHandler()
 console.setLevel(logging.DEBUG)
-# Format: DateTime: <message>
+
+# Format = DateTime: <message>
 # http://strftime.org/
 formatter = logging.Formatter('%(asctime)s: %(message)s', '%m-%d-%y %H:%M:%S')
 console.setFormatter(formatter)
 logging.getLogger('').addHandler(console)
 
+# Logging should be working now
 logging.info('This will get logged to a file called scrapping.log')
 
+# Original fetch function
 def fetch(hostname, filename):
     return bs.BeautifulSoup(urlopen(Request(hostname + filename, headers={'User-Agent': 'X'})).read(), 'lxml')
-
-# Code seems to be repeatedly calling out to the CarConnection website. No wonder it takes 8 hours to run currently...
-# Instead, let's cache the basics like Makes & Models to speed this up.
-all_makes_list = []     # Makes like Ford, Chevy
-all_models_list = []    # Make_Models like Toyota Corolla
-all_years_list = []     # Make_Model_Years like Toyota Corolla 2010
-all_specs_list = []     # Make_Model_Year_Spec like Toyota Corolla 2010 XYZ
-all_trims_list = []     # Make_Model_Year_Spec_Trim like Toyota Corolla 2010 XYZ ABC
-
-# File Names for storing to & pulling from for future runs
-all_makes_file = "txt_files/all_makes_file.txt"
-all_models_file = "txt_files/all_models_file.txt"
-all_years_file = "txt_files/all_years_file.txt"
-all_specs_file = "txt_files/all_specs_file.txt"
 
 # Async fetch for some super fast data minin'
 async def asyncfetch(session, url, sem):
@@ -67,12 +71,12 @@ async def asyncfetch(session, url, sem):
 
 # Async gather - give it a session, and a list of URLs, fetches everything and returns it
 async def async_fetch_all(session, urls, sem):
-    logging.info("async_fetch_all: %s %s %s", session, urls, sem)
+    logging.info("async_fetch_all: %s %s", len(urls), sem)
     results = await asyncio.gather(*[asyncio.create_task(asyncfetch(session, url, sem))
-                                     for url in urls])
+                                     for url in urls], return_exceptions=True)
     return results
 
-# Dump to file function
+# File IO functions
 def dump2file(file_name, list_arr):
     with open(file_name, 'wb') as f:
         pickle.dump(list_arr, f)
@@ -81,8 +85,6 @@ def readFromfile(file_name):
     with open(file_name, 'rb') as f:
         list_arr = pickle.load(f)
         return list_arr
-
-# Read from file function
 
 # Grabs all the Makes on https://www.thecarconnection.com/new-cars
 # Example: Ford, Chrysler, Toyota, etc
@@ -190,21 +192,30 @@ async def all_specs():
     # This call has ~3931 URLs, so we don't want to overwhelm aiohttp
     # Will limit it to 10 connections at the same time, and make it wait til those respond.
     # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
-    sem = asyncio.Semaphore(10)
+    sem = asyncio.Semaphore(2)
 
     # Async call to get all the specs for every make/model/year combo
     async with aiohttp.ClientSession() as session:
+        # This works, but may cause results to be empty. Need to investigate it more.
+        results = await async_fetch_all(session, all_years_list, sem)
+
+        # This is tricky, if needed come back and try to get this working
+        # https://docs.python.org/3/library/asyncio-task.html#running-tasks-concurrently
+        # https://stackoverflow.com/questions/34509586/how-to-know-which-coroutines-were-done-with-asyncio-wait
+        # https://stackoverflow.com/questions/52245922/is-it-more-efficient-to-use-create-task-or-gather
         # ALL_COMPLETED == don't return until every single make_model_year is found
-        results = await asyncio.wait(async_fetch_all(session, all_years_list, sem), return_when=ALL_COMPLETED)
+        #http_task = asyncio.ensure_future(async_fetch_all(session, all_years_list, sem))
 
-    for spec in results:
-        soup = BeautifulSoup(spec, 'html.parser')
+    # Seems like 3931 URLs can cause the await to not really wait... so check for empty lists first
+    if results:
+        for spec in results:
+            soup = BeautifulSoup(spec, 'html.parser')
 
-        for id in soup.find_all("a", {"id": "ymm-nav-specs-btn"}):
-            # Pretty sure year_model_overview() needs to be year_model_overview_list,
-            # otherwise we're going to have some infinite recursion with my optimizations
-            all_specs_list.append(website + id['href'])
-            logging.debug("year_model_overview: %s", id['href'])
+            for id in soup.find_all("a", {"id": "ymm-nav-specs-btn"}):
+                # Pretty sure year_model_overview() needs to be year_model_overview_list,
+                # otherwise we're going to have some infinite recursion with my optimizations
+                all_specs_list.append(website + id['href'])
+                logging.debug("year_model_overview: %s", id['href'])
     
     # Log how many of these combos we find
     logging.info("Found %s Make/Model/Year/Spec Combinations", len(all_specs_list))
@@ -285,7 +296,7 @@ logging.critical("Collected all Years successfully")
 # Write the years to a file with the same name for easy retrieval.
 dump2file(all_years_file, all_years_list)
 
-#asyncio.run(all_specs())
+asyncio.run(all_specs())
 logging.critical("Collected all Specs successfully")
 #all_specs_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
 
