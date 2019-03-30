@@ -219,9 +219,9 @@ async def all_years():
 async def all_specs():
 
     # This call has ~3931 URLs, so we don't want to overwhelm aiohttp
-    # Will limit it to 4 connections at the same time, and make it wait til those respond.
+    # Will limit it to 5 connections at the same time, and make it wait til those respond.
     # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
-    sem = asyncio.Semaphore(4)
+    sem = asyncio.Semaphore(5)
 
     # Async call to get all the specs for every make/model/year combo
     async with aiohttp.ClientSession() as session:
@@ -261,7 +261,7 @@ async def all_trims():
 
     # Same as all_specs(), this has ~3800 URLs to hit so limit of 4 concurrent requests
     # to avoid overwhelming the server
-    sem = asyncio.Semaphore(4)
+    sem = asyncio.Semaphore(5)
     
     # GATHER ALL THE TRIMS!1!1
     async with aiohttp.ClientSession() as session:
@@ -289,7 +289,7 @@ async def all_trims():
                 # we should wrap this in a try/except and log any weird errors we run into.
                 try:
                     for i in range(len(div_a)):
-                        all_trims_list.append(div_a[-i]['href'])
+                        all_trims_list.append(website + div_a[-i]['href'])
                         logging.debug("i in range(len(div_a)): %s", div_a[-i]['href'])
 
                 except Exception as e:
@@ -333,25 +333,56 @@ all_trims_list = try2readfile("all_trims_list", all_trims_list, all_trims_file, 
 # Write this all out to a CSV file in csv_files
 pd.DataFrame(all_trims_list).to_csv(trimsCsvFile, index=False, header=None)
 
-logging.info("Scrapping **DONE**")
-trims = pd.read_csv(csvFile)
+logging.info("Scrapping Make/Model/Year/Spec/Trim **DONE**")
 
 # This must grab specs for everything, looks like price + MSRP
-def specifications():
-    specifications_table = pd.DataFrame()
+async def specifications():
+    # 32,000 URLs to hit, so limit of 5 concurrent requests to avoid overwhelming the server
+    sem = asyncio.Semaphore(5)
     
-    for row in trims.iloc[:, 0]:
-        soup = fetch(website, row)
-        specifications_df = pd.DataFrame(columns=[soup.find_all("title")[0].text[:-15]])
-        msrp_text = soup.find_all("div", {"class": "price"})[0]
-        if len(msrp_text.find_all("a")) >= 1:
-            specifications_df.loc["MSRP"] = msrp_text.find_all("a")[0].text
-        for div in soup.find_all("div", {"class": "specs-set-item"}):
-            row_name = div.find_all("span")[0].text
-            row_value = div.find_all("span")[1].text
-            specifications_df.loc[row_name] = row_value
-        specifications_table = pd.concat([specifications_table, specifications_df], axis=1, sort=False)
+    # GATHER ALL THE SPECS!1!1
+    async with aiohttp.ClientSession() as session:
+        results = await async_fetch_all(session, all_trims_list, sem)
+             
+    specifications_table = pd.DataFrame()
+
+    if results:
+        for row in results:
+            soup = BeautifulSoup(row, 'html.parser')
+             
+            specifications_df = pd.DataFrame(columns=[soup.find_all("title")[0].text[:-15]])
+
+            # Let's see what this pulls back
+            logging.debug("specifications_df: %s", specifications_df)
+            
+            msrp_text = soup.find_all("div", {"class": "price"})[0]
+            logging.debug("msrp_text: %s", msrp_text)
+            
+            if len(msrp_text.find_all("a")) >= 1:
+                specifications_df.loc["MSRP"] = msrp_text.find_all("a")[0].text
+                logging.debug("msrp_text: %s", specifications_df.loc["MSRP"])
+                
+            for div in soup.find_all("div", {"class": "specs-set-item"}):
+                row_name = div.find_all("span")[0].text
+                row_value = div.find_all("span")[1].text
+                specifications_df.loc[row_name] = row_value
+                logging.debug("Row name: %s", row_name)
+                logging.debug("Row value: %s", row_value)
+                
+            specifications_table = pd.concat([specifications_table, specifications_df], axis=1, sort=False)
+
+    #        #DONE
+    logging.info("Finishing scrapin' specs")
     return specifications_table
 
-logging.info("Specifications time...")
-#specifications().to_csv(dataCsvFile)
+# With all 32,000 vehicles, we can finally pull in all their specs. Woo hoo!
+logging.info("Specifications Scrapin' time!1!")
+specs_csv = asyncio.run(specifications())
+
+if specs_csv:
+   specs_csv.to_csv(dataCsvFile)
+
+logging.info("Finished getting data!")
+
+
+
