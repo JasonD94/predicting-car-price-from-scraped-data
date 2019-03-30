@@ -49,7 +49,13 @@ which basically says to install lxml:
 pip install lxml
 ```
 
-4. Run the [scraping.py](./scraping.py) scipt using Python in bash/cmd or with
+4. My optimized version requires aiohttp to run parallel web requests:
+
+```console
+pip install aiohttp
+```
+
+5. Run the [scraping.py](./scraping.py) scipt using Python in bash/cmd or with
 an IDE like [IDLE](https://docs.python.org/3/library/idle.html). The scraping
 script takes a while to run, so give it a chance to run.
 

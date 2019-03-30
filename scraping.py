@@ -1,7 +1,10 @@
 import logging
 import bs4 as bs
-from urllib.request import Request, urlopen
 import pandas as pd
+import aiohttp
+import asyncio
+from urllib.request import Request, urlopen
+from bs4 import BeautifulSoup
 
 website = "https://www.thecarconnection.com"
 csvFile = "new_cars.csv"
@@ -34,11 +37,26 @@ def fetch(hostname, filename):
 
 # Code seems to be repeatedly calling out to the CarConnection website. No wonder it takes 8 hours to run currently...
 # Instead, let's cache the basics like Makes & Models to speed this up.
-all_makes_list = []
-make_menu_list = []
-model_menu_list = []
+all_makes_list = []     # Makes like Ford, Chevy
+all_models_list = []    # Make_Models like Toyota Corolla
+all_years_list = []     # Make_Model_Years like Toyota Corolla 2010
 year_model_overview_list = []
 trim_list = []
+
+# Async fetch for some super fast data minin'
+async def asyncfetch(session, url):
+    async with session.get(url) as response:
+        if response.status != 200:
+            response.raise_for_status()
+            logging.critical("Failed to get async request!")
+        logging.debug("Got response for: %s", url)
+        return await response.text()
+
+# Async gather - give it a session, and a list of URLs, fetches everything and returns it
+async def async_fetch_all(session, urls):
+    results = await asyncio.gather(*[asyncio.create_task(asyncfetch(session, url))
+                                     for url in urls])
+    return results
 
 # Grabs all the Makes on https://www.thecarconnection.com/new-cars
 # Example: Ford, Chrysler, Toyota, etc
@@ -48,9 +66,9 @@ def all_makes():
 
     # Now caching the makes list
     if (len(all_makes_list) == 0):
-        
+
         for a in fetch(website, "/new-cars").find_all("a", {"class": "add-zip"}):
-            all_makes_list.append(a['href'])
+            all_makes_list.append(website + a['href'])
             # Ex: Found Car Make: /make/new,toyota
             # <a class="add-zip " href="/make/new,toyota" title="Toyota">Toyota</a>
             logging.debug("Found Car Make: %s", a['href'])
@@ -65,51 +83,59 @@ def all_makes():
 # Example: Toyota Corolla
 #  Format: https://www.thecarconnection.com/cars/toyota_corolla
 # Appears to be *432* of these
-def all_make_models():
+async def all_make_models():
 
-    # Now caching Make_Models list
-    if (len(make_menu_list) == 0):
-        for make in all_makes():
-            for div in fetch(website, make).find_all("div", {"class": "name"}):
-                make_menu_list.append(div.find_all("a")[0]['href'])
-                # Ex: Found Model for /make/new,toyota: /cars/toyota_corolla
-                # <a href="/cars/toyota_corolla">Toyota Corolla</a>
-                logging.debug("Found Model for %s: %s", make, div.find_all("a")[0]['href'])
+    # Trying some async Python for looping to make this go super quick (hopefully)
+    # Results: 5 seconds quicker for this call.
+    # https://stackoverflow.com/a/48052347
+    # https://stackoverflow.com/a/35900453
+    async with aiohttp.ClientSession() as session:
+        results = await async_fetch_all(session, all_makes_list)
 
-        # Log how many Make/Model combos we find
-        logging.info("Found %s Make & Model Combinations", len(make_menu_list))
+    for model in results:
+        soup = BeautifulSoup(model, 'html.parser')
 
-    logging.info("Returning make_menu_list")
-    return make_menu_list
+        for div in soup.find_all("div", {"class": "name"}):
+            all_models_list.append(website + div.find_all("a")[0]['href'])
+            # Ex: Found Model for /make/new,toyota: /cars/toyota_corolla
+            # <a href="/cars/toyota_corolla">Toyota Corolla</a>
+            logging.debug("Found Make Model Combo: %s", div.find_all("a")[0]['href'])
+
+    # Log how many Make/Model combos we find
+    logging.info("Found %s Make & Model Combinations", len(all_models_list))
+    return all_models_list
 
 # Grabs all the years for every given make/model combination
 # Example: 2010 Toyota Corolla
 #  Format: https://www.thecarconnection.com/overview/toyota_corolla_2010
 # Appears to be *3931* of these
-def all_make_model_years():
+async def all_make_model_years():
 
-    # Caching the Make_Models_Years list
-    if(len(model_menu_list) == 0):
-        for make in all_make_models():
-            soup = fetch(website, make)
-            for div in soup.find_all("a", {"class": "btn avail-now first-item"}):
-                model_menu_list.append(div['href'])
-                # I think this gets the current model year, such as:
-                # <a class="btn avail-now 1" href="/overview/toyota_corolla_2019" title="2019 Toyota Corolla Review">2019</a>
-                # Which would be "2019"
-                logging.debug("Current Model Year: %s", div['href'])
-            for div in soup.find_all("a", {"class": "btn 1"}):
-                model_menu_list.append(div['href'])
-                # Seems like this gets each additional Model Year, such as:
-                # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
-                # Which would be "2018"
-                logging.debug("Additional Model Years: %s", div['href'])
+    # Async call to get all make/model/year combos (3931 of these!)
+    # Results: 
+    async with aiohttp.ClientSession() as session:
+        results = await async_fetch_all(session, all_models_list)
 
-        # Log how many Make/Model/Years combos we find
-        logging.info("Found %s Make/Model/Year Combinations", len(model_menu_list))
+    for year in results:
+        soup = BeautifulSoup(year, 'html.parser')
 
-    logging.info("Returning model_menu_list")
-    return model_menu_list
+        for div in soup.find_all("a", {"class": "btn avail-now first-item"}):
+            all_years_list.append(div['href'])
+            # I think this gets the current model year, such as:
+            # <a class="btn avail-now 1" href="/overview/toyota_corolla_2019" title="2019 Toyota Corolla Review">2019</a>
+            # Which would be "2019"
+            logging.debug("Current Model Year: %s", div['href'])
+            
+        for div in soup.find_all("a", {"class": "btn 1"}):
+            all_years_list.append(div['href'])
+            # Seems like this gets each additional Model Year, such as:
+            # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
+            # Which would be "2018"
+            logging.debug("Additional Model Years: %s", div['href'])
+
+    # Log how many Make/Model/Years combos we find
+    logging.info("Found %s Make/Model/Year Combinations", len(all_years_list))
+    return all_years_list
 
 # Specs for each Make + Model + Year?
 # TBD
@@ -160,8 +186,15 @@ logging.info("Starting scraping.py ...")
 # When that completes, fire off all the make_model_years
 # And when that's done, gather all the specs for make_model_year_specs
 # Finally, ALL trims for every single make_model_year_specs
-#all_makes_list = all_makes()
-#make_menu_list = all_make_models()
+all_makes_list = all_makes()
+all_models_list = asyncio.run(all_make_models())
+
+logging.critical("Wow made it through all the make and models!")
+
+all_years_list = asyncio.run(all_make_model_years())
+
+logging.critical("Holy shit made it through all make model years!")
+
 #model_menu_list = all_make_model_years()
 #year_model_overview_list = all_make_model_years_specs()
 #trim_list = trims()
