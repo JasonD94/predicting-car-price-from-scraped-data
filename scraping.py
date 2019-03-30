@@ -45,22 +45,23 @@ all_specs_list = []     # Make_Model_Year_Spec like Toyota Corolla 2010 XYZ
 all_trims_list = []     # Make_Model_Year_Spec_Trim like Toyota Corolla 2010 XYZ ABC
 
 # Async fetch for some super fast data minin'
-async def asyncfetch(session, url):
+async def asyncfetch(session, url, sem):
     try:
-        timeout = aiohttp.ClientTimeout(total=120)
-        async with session.get(url, timeout=timeout) as response:
-            if response.status != 200:
-                response.raise_for_status()
-                logging.critical("Failed to get async request!")
-            logging.debug("Got response for: %s", url)
-            return await response.text()
+        async with sem:
+            timeout = aiohttp.ClientTimeout(total=120)
+            async with session.get(url, timeout=timeout) as response:
+                if response.status != 200:
+                    response.raise_for_status()
+                    logging.critical("Failed to get async request!")
+                logging.debug("Got response for: %s", url)
+                return await response.text()
     except Exception as e:
         logging.error('exception: %s %s', type(e), str(e))
         return
 
 # Async gather - give it a session, and a list of URLs, fetches everything and returns it
-async def async_fetch_all(session, urls):
-    results = await asyncio.gather(*[asyncio.create_task(asyncfetch(session, url))
+async def async_fetch_all(session, urls, sem):
+    results = await asyncio.gather(*[asyncio.create_task(asyncfetch(session, url, sem))
                                      for url in urls])
     return results
 
@@ -86,12 +87,17 @@ def all_makes():
 # Appears to be *432* of these
 async def all_models():
 
+    # Don't overwhelm aiohttp!
+    # 10 Requests *at most* at a time
+    # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
+    sem = asyncio.Semaphore(10)
+
     # Trying some async Python for looping to make this go super quick (hopefully)
     # Results: 5 seconds quicker for this call.
     # https://stackoverflow.com/a/48052347
     # https://stackoverflow.com/a/35900453
     async with aiohttp.ClientSession() as session:
-        results = await async_fetch_all(session, all_makes_list)
+        results = await async_fetch_all(session, all_makes_list, sem)
 
     for model in results:
         soup = BeautifulSoup(model, 'html.parser')
@@ -111,10 +117,15 @@ async def all_models():
 # Appears to be *3931* of these
 async def all_years():
 
+    # Don't overwhelm aiohttp!
+    # 10 Requests *at most* at a time
+    # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
+    sem = asyncio.Semaphore(10)
+
     # Async call to get all make/model/year combos (3931 of these!)
     # Results: 
     async with aiohttp.ClientSession() as session:
-        results = await async_fetch_all(session, all_models_list)
+        results = await async_fetch_all(session, all_models_list, sem)
 
     for year in results:
         soup = BeautifulSoup(year, 'html.parser')
@@ -140,9 +151,14 @@ async def all_years():
 # TBD
 async def all_specs():
 
+    # This call has ~3931 URLs, so we don't want to overwhelm aiohttp
+    # Will limit it to 10 connections at the same time, and make it wait til those respond.
+    # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
+    sem = asyncio.Semaphore(10)
+
     # Async call to get all the specs for every make/model/year combo
     async with aiohttp.ClientSession() as session:
-        results = await async_fetch_all(session, all_years_list)
+        results = await async_fetch_all(session, all_years_list, sem)
 
     for spec in results:
         soup = BeautifulSoup(spec, 'html.parser')
@@ -200,7 +216,7 @@ asyncio.run(all_specs())
 logging.critical("Collected all Specs successfully")
 #all_specs_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
 
-asyncio.run(all_trims())
+#asyncio.run(all_trims())
 logging.critical("Collected all Trims successfully")
 
 pd.DataFrame(all_trims_list).to_csv(trimsCsvFile, index=False, header=None)
@@ -226,4 +242,4 @@ def specifications():
     return specifications_table
 
 logging.info("Specifications time...")
-specifications().to_csv(dataCsvFile)
+#specifications().to_csv(dataCsvFile)
