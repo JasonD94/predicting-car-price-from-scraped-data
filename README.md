@@ -4,7 +4,6 @@ Scraping data from [The Car Connection](https://www.thecarconnection.com)
 Original repo forked from [nicolas-gervais/predicting-car-price-from-scraped-data](https://github.com/nicolas-gervais/predicting-car-price-from-scraped-data)
 
 Original Reddit post:
- 
 [I scraped 32,000 cars, including the price and 115 specifications](https://www.reddit.com/r/datasets/comments/b6rcwv/i_scraped_32000_cars_including_the_price_and_115/)
 
 From the 
@@ -73,6 +72,17 @@ pip install aiohttp
 5. Run the [scraping.py](./scraping.py) scipt using Python in bash/cmd or with
 an IDE like [IDLE](https://docs.python.org/3/library/idle.html). The scraping
 script takes a while to run, so give it a chance to run.
+
+6. Run this script with **64 BIT PYTHON**. 32 Bit Python will throw memory exceptions
+due to the insane number of URLs to scrap (~3800 - ~3900). The default download
+on the python.org/downloads/ page is 32 bit - go directly to the latest version
+of Python (3.7.3 as of this writing) and download the x86-64 version for your
+platform. My machine is a 64 bit version of Windows 10, so I grabbed this download:
+
+[Windows x86-64 executable installer](https://www.python.org/ftp/python/3.7.3/python-3.7.3-amd64.exe)
+
+Which can be found here:
+[python.org/downloads/release/python-373/](https://www.python.org/downloads/release/python-373/)
 
 ## *Random Note:* an IDLE Dark Mode Theme
 Place [config-highlight.cfg](./config-highlight.cfg) inside **HOMEDIR**/.idlerc/ and go to 

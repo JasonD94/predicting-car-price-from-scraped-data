@@ -10,8 +10,8 @@ from bs4 import BeautifulSoup
 website = "https://www.thecarconnection.com"
 
 # File Names for storing to & pulling from for future runs
-trimsCsvFile = "csv/every_single_car.csv"
-dataCsvFile = "csv/the_big_data.csv"
+trimsCsvFile = "csv_files/every_single_car.csv"
+dataCsvFile = "csv_files/the_big_data.csv"
 
 all_makes_file = "txt_files/all_makes_file.txt"
 all_models_file = "txt_files/all_models_file.txt"
@@ -66,7 +66,7 @@ async def asyncfetch(session, url, sem):
                 logging.debug("Got response for: %s", url)
                 return await response.text()
     except Exception as e:
-        logging.error('exception: %s %s', type(e), str(e))
+        logging.error('aiohttp exception: %s %s', type(e), str(e))
         return
 
 # Async gather - give it a session, and a list of URLs, fetches everything and returns it
@@ -215,7 +215,7 @@ async def all_years():
     dump2file(all_years_file, all_years_list)
 
 # Specs for each Make + Model + Year
-# TBD
+# Appears to be around 3812 of these
 async def all_specs():
 
     # This call has ~3931 URLs, so we don't want to overwhelm aiohttp
@@ -256,26 +256,50 @@ async def all_specs():
     dump2file(all_specs_file, all_specs_list)
 
 # This must be all the trims for a given Make/Model/Year/Spec
-# TBD
+# TBD how many we find
 async def all_trims():
+
+    # Same as all_specs(), this has ~3800 URLs to hit so limit of 4 concurrent requests
+    # to avoid overwhelming the server
+    sem = asyncio.Semaphore(4)
     
-    # GATHER ALL THE TRIMS >:)
+    # GATHER ALL THE TRIMS!1!1
     async with aiohttp.ClientSession() as session:
-        results = await async_fetch_all(session, all_specs_list)
+        results = await async_fetch_all(session, all_specs_list, sem)
 
-    for trim in results:
-        soup = BeautifulSoup(trim, 'html.parser')
-        
-        div = soup.find_all("div", {"class": "block-inner"})[-1]
-        div_a = div.find_all("a")
-        logging.debug("Trims div: %s", div)
-        logging.debug("Trims div_a: %s", div_a)
-        for i in range(len(div_a)):
-            all_trims_list.append(div_a[-i]['href'])
-            logging.debug("i in range(len(div_a)): %s", div_a[-i]['href'])
+    # Seems like 3812 URLs can cause the await to not really wait... so check for empty lists first
+    if results:
+        for trim in results:
+            soup = BeautifulSoup(trim, 'html.parser')
+            
+            div = soup.find_all("div", {"class": "block-inner"})[-1]
+            div_a = div.find_all("a")
+            logging.debug("Trims div: %s", div)
+            logging.debug("Trims div_a: %s", div_a)
 
-    # Log how many of these combos we find
+            #
+            # Ran into an exception on the len(div_a) call. I think the original code this is based on
+            # must have ran into the same problem, based on the following snippet of code I spotted:
+            # year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
+            # The exception I saw happened around here at this make_model_year_spec:
+            # /specifications/buick_encore_2013_awd-4dr-convenience
+            #
+            # Since it's possible for this to happen anywhere if the pages aren't 100% the same setup,
+            # we should wrap this in a try/except and log any weird errors we run into.
+            try:
+                for i in range(len(div_a)):
+                    all_trims_list.append(div_a[-i]['href'])
+                    logging.debug("i in range(len(div_a)): %s", div_a[-i]['href'])
+
+            except Exception as e:
+                logging.error('all_trims exception at for i in range(len(div_a)): %s %s', type(e), str(e))
+                return
+
+    # Log how many of these trim combos we find
     logging.info("Found %s Make/Model/Year/Trim Combinations", len(all_trims_list))
+
+    # Write the trims to a file
+    dump2file(all_trims_file, all_trims_list)
 
 logging.info("Starting scraping.py ...")
 
@@ -299,10 +323,10 @@ all_years_list = try2readfile("all_years_list", all_years_list, all_years_file, 
 # Now caching the specs list
 all_specs_list = try2readfile("all_specs_list", all_specs_list, all_specs_file, all_specs)
 
-# todo: trims
-#asyncio.run(all_trims())
-logging.critical("Collected all Trims successfully")
+# Now caching the trims list
+all_trims_list = try2readfile("all_trims_list", all_trims_list, all_trims_file, all_trims)
 
+# Write this all out to a CSV file in csv_files
 pd.DataFrame(all_trims_list).to_csv(trimsCsvFile, index=False, header=None)
 
 logging.info("Scrapping **DONE**")
