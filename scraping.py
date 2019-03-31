@@ -253,10 +253,8 @@ async def all_specs():
                 all_specs_list.append(website + id['href'])
                 logging.debug("year_model_overview: %s", id['href'])
     
-    # Log how many of these combos we find
+    # Log how many of these combos we find & dump the results to a file
     logging.info("Found %s Make/Model/Year/Spec Combinations", len(all_specs_list))
-
-    # Write the specs to a file
     dump2file(all_specs_file, all_specs_list)
 
 # This must be all the trims for a given Make/Model/Year/Spec
@@ -303,13 +301,11 @@ async def all_trims():
                 # Actually, seems like one of the trims might just be coming back as null for some reason...
                 logging.error("found a null trim: %s", trim)
 
-    # Log how many of these trim combos we find
+    # Log how many of these trim combos we find & dump to file
     logging.info("Found %s Make/Model/Year/Trim Combinations", len(all_trims_list))
-
-    # Write the trims to a file
     dump2file(all_trims_file, all_trims_list)
 
-# This must grab specs for everything, looks like price + MSRP
+# Collect all the data on the 32,000 cars we found
 async def specifications():
     # 32,000 URLs to hit, so limit of 5 concurrent requests to avoid overwhelming the server
     sem = asyncio.Semaphore(5)
@@ -318,9 +314,11 @@ async def specifications():
     async with aiohttp.ClientSession() as session:
         results = await async_fetch_all(session, all_trims_list, sem)
 
+    # Log and dump to file
     logging.info("Found all the specifications data! Found %s data rows to process.", len(results))
-    return results
+    dump2file(all_data_file, all_data_list)
 
+# Finally, process the results and save to a CSV for future use
 def processSpecifications(row):
 
     soup = BeautifulSoup(row, 'html.parser')
