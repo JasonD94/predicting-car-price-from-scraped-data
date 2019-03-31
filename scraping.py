@@ -322,36 +322,29 @@ async def specifications():
     return results
 
 def processSpecifications(row):
-    specifications_table = pd.DataFrame()
 
-    if results:
-        for row in results:
-            soup = BeautifulSoup(row, 'html.parser')
-             
-            specifications_df = pd.DataFrame(columns=[soup.find_all("title")[0].text[:-15]])
+    soup = BeautifulSoup(row, 'html.parser')
+     
+    specifications_df = pd.DataFrame(columns=[soup.find_all("title")[0].text[:-15]])
 
-            # Let's see what this pulls back
-            logging.debug("specifications_df: %s", specifications_df)
-            
-            msrp_text = soup.find_all("div", {"class": "price"})[0]
-            logging.debug("msrp_text: %s", msrp_text)
-            
-            if len(msrp_text.find_all("a")) >= 1:
-                specifications_df.loc["MSRP"] = msrp_text.find_all("a")[0].text
-                logging.debug("msrp_text: %s", specifications_df.loc["MSRP"])
-                
-            for div in soup.find_all("div", {"class": "specs-set-item"}):
-                row_name = div.find_all("span")[0].text
-                row_value = div.find_all("span")[1].text
-                specifications_df.loc[row_name] = row_value
-                logging.debug("Row name: %s", row_name)
-                logging.debug("Row value: %s", row_value)
-                
-            specifications_table = pd.concat([specifications_table, specifications_df], axis=1, sort=False)
-
-    #        #DONE
-    logging.info("Finishing scrapin' specs")
-    return specifications_table
+    # Let's see what this pulls back
+    logging.debug("specifications_df: %s", specifications_df)
+    
+    msrp_text = soup.find_all("div", {"class": "price"})[0]
+    logging.debug("msrp_text: %s", msrp_text)
+    
+    if len(msrp_text.find_all("a")) >= 1:
+        specifications_df.loc["MSRP"] = msrp_text.find_all("a")[0].text
+        logging.debug("msrp_text: %s", specifications_df.loc["MSRP"])
+        
+    for div in soup.find_all("div", {"class": "specs-set-item"}):
+        row_name = div.find_all("span")[0].text
+        row_value = div.find_all("span")[1].text
+        specifications_df.loc[row_name] = row_value
+        logging.debug("Row name: %s", row_name)
+        logging.debug("Row value: %s", row_value)
+        
+    return pd.concat([specifications_table, specifications_df], axis=1, sort=False)
 
 logging.info("Starting scraping.py ...")
 
@@ -392,6 +385,7 @@ all_data_list = try2readfile("all_data_list", all_data_list, all_data_file, spec
 
 # Process the specification data in parallel using Joblib
 # https://stackoverflow.com/a/50926231
+specifications_table = pd.DataFrame()
 num_cores = multiprocessing.cpu_count()
 final_results = Parallel(n_jobs=num_cores)(delayed(processSpecifications)(row) for row in all_data_list)
 
