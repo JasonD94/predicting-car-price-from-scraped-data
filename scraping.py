@@ -4,12 +4,18 @@ import pandas as pd
 import aiohttp
 import asyncio
 import pickle
+import time
 import multiprocessing
+import joblib
+
 from joblib import Parallel, delayed
 from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
 
 website = "https://www.thecarconnection.com"
+
+# For parallel processing data
+num_cores = multiprocessing.cpu_count() - 1  # don't freeze the machine!
 
 # File Names for storing to & pulling from for future runs
 trimsCsvFile = "csv_files/every_single_car.csv"
@@ -242,21 +248,28 @@ async def all_specs():
         # ALL_COMPLETED == don't return until every single make_model_year is found
         #http_task = asyncio.ensure_future(async_fetch_all(session, all_years_list, sem))
 
-    # Seems like 3931 URLs can cause the await to not really wait... so check for empty lists first
+    # Process all the spec URLs using Joblib across n-1 cores (7 for an i7 4790k)
+    # Joblib is awesome: https://joblib.readthedocs.io/en/latest/parallel.html#
+    # Using shared memory so we can just append the results to the all_specs_list
+    # https://joblib.readthedocs.io/en/latest/parallel.html#shared-memory-semantics
     if results:
-        for spec in results:
-            soup = BeautifulSoup(spec, 'html.parser')
+        Parallel(n_jobs=num_cores, verbose=0, require='sharedmem')(delayed(processSpecUrls)(spec) for spec in results)
 
-            for id in soup.find_all("a", {"id": "ymm-nav-specs-btn"}):
-                # Pretty sure year_model_overview() needs to be year_model_overview_list,
-                # otherwise we're going to have some infinite recursion with my optimizations
-                all_specs_list.append(website + id['href'])
-                logging.debug("year_model_overview: %s", id['href'])
-    
     # Log how many of these combos we find & dump the results to a file
     logging.info("Found %s Make/Model/Year/Spec Combinations", len(all_specs_list))
     dump2file(all_specs_file, all_specs_list)
+
+    logging.info("This is what we got back: %s", all_specs_list)
+    time.sleep(30)
+    
     return all_specs_list
+
+# Separated out the processing of each URL so we can use Joblib for parallel processing
+def processSpecUrls(spec):
+    soup = BeautifulSoup(spec, 'html.parser')
+
+    for id in soup.find_all("a", {"id": "ymm-nav-specs-btn"}):
+        all_specs_list.append(website + id['href'])
 
 # This must be all the trims for a given Make/Model/Year/Spec
 # Turns out there's ~32321 Make/Model/Year/Trim Combinations! Jeez.
@@ -270,42 +283,42 @@ async def all_trims():
     async with aiohttp.ClientSession() as session:
         results = await async_fetch_all(session, all_specs_list, sem)
 
-    # Seems like 3812 URLs can cause the await to not really wait... so check for empty lists first
+    # See note under all_specs for what Joblib does
     if results:
-        for trim in results:
-            if trim:
-                soup = BeautifulSoup(trim, 'html.parser')
-                
-                div = soup.find_all("div", {"class": "block-inner"})[-1]
-                div_a = div.find_all("a")
-                #logging.debug("Trims div: %s", div)
-                #logging.debug("Trims div_a: %s", div_a)
-
-                #
-                # Ran into an exception on the len(div_a) call. I think the original code this is based on
-                # must have ran into the same problem, based on the following snippet of code I spotted:
-                # year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
-                # The exception I saw happened around here at this make_model_year_spec:
-                # /specifications/buick_encore_2013_awd-4dr-convenience
-                #
-                # Since it's possible for this to happen anywhere if the pages aren't 100% the same setup,
-                # we should wrap this in a try/except and log any weird errors we run into.
-                try:
-                    for i in range(len(div_a)):
-                        all_trims_list.append(website + div_a[-i]['href'])
-                        logging.debug("Trims URL: %s", div_a[-i]['href'])
-
-                except Exception as e:
-                    logging.error('all_trims exception at for i in range(len(div_a)): %s %s', type(e), str(e))
-                    return
-            else:
-                # Actually, seems like one of the trims might just be coming back as null for some reason...
-                logging.error("found a null trim: %s", trim)
-
+        Parallel(n_jobs=num_cores, verbose=0, require='sharedmem')(delayed(processTrimUrls)(trim) for trim in results)
+        
     # Log how many of these trim combos we find & dump to file
     logging.info("Found %s Make/Model/Year/Trim Combinations", len(all_trims_list))
     dump2file(all_trims_file, all_trims_list)
     return all_trims_list
+
+# Separated out for Joblib
+def processTrimUrls(trim):
+    if trim:
+        soup = BeautifulSoup(trim, 'html.parser')
+        
+        div = soup.find_all("div", {"class": "block-inner"})[-1]
+        div_a = div.find_all("a")
+
+        #
+        # Ran into an exception on the len(div_a) call. I think the original code this is based on
+        # must have ran into the same problem, based on the following snippet of code I spotted:
+        # year_model_overview_list.remove("/specifications/buick_enclave_2019_fwd-4dr-preferred")
+        # The exception I saw happened around here at this make_model_year_spec:
+        # /specifications/buick_encore_2013_awd-4dr-convenience
+        #
+        # Since it's possible for this to happen anywhere if the pages aren't 100% the same setup,
+        # we should wrap this in a try/except and log any weird errors we run into.
+        try:
+            for i in range(len(div_a)):
+                all_trims_list.append(website + div_a[-i]['href'])
+
+        except Exception as e:
+            logging.error('all_trims exception at for i in range(len(div_a)): %s %s', type(e), str(e))
+            return
+    else:
+        # Actually, seems like one of the trims might just be coming back as null for some reason...
+        logging.error("found a null trim: %s", trim)
 
 # Collect all the data on the 32,000 cars we found
 async def specifications():
@@ -380,7 +393,6 @@ all_data_list = try2readfile("all_data_list", all_data_list, all_data_file, spec
 # Process the specification data in parallel using Joblib
 # https://stackoverflow.com/a/50926231
 specifications_table = pd.DataFrame()
-num_cores = multiprocessing.cpu_count() - 1  # don't freeze the machine!
 final_results = Parallel(n_jobs=num_cores)(delayed(processSpecifications)(row) for row in all_data_list)
 
 # Save The results to a txt file for future use
