@@ -318,7 +318,7 @@ async def specifications():
 
     # Log and dump to file
     logging.info("Found all the specifications data! Found %s data rows to process.", len(results))
-    dump2file(all_data_file, all_data_list)
+    dump2file(all_data_file, results)
     return results
 
 # Finally, process the results and save to a CSV for future use
@@ -327,25 +327,18 @@ def processSpecifications(row):
     soup = BeautifulSoup(row, 'html.parser')
      
     specifications_df = pd.DataFrame(columns=[soup.find_all("title")[0].text[:-15]])
-
-    # Let's see what this pulls back
-    logging.debug("specifications_df: %s", specifications_df)
-    
     msrp_text = soup.find_all("div", {"class": "price"})[0]
-    logging.debug("msrp_text: %s", msrp_text)
     
     if len(msrp_text.find_all("a")) >= 1:
         specifications_df.loc["MSRP"] = msrp_text.find_all("a")[0].text
-        logging.debug("msrp_text: %s", specifications_df.loc["MSRP"])
         
     for div in soup.find_all("div", {"class": "specs-set-item"}):
         row_name = div.find_all("span")[0].text
         row_value = div.find_all("span")[1].text
         specifications_df.loc[row_name] = row_value
-        logging.debug("Row name: %s", row_name)
-        logging.debug("Row value: %s", row_value)
         
-    return pd.concat([specifications_table, specifications_df], axis=1, sort=False)
+    # Only returning each DataFrame - we can concat these together after
+    return specifications_df
 
 logging.info("Starting scraping.py ...")
 
@@ -387,23 +380,31 @@ all_data_list = try2readfile("all_data_list", all_data_list, all_data_file, spec
 # Process the specification data in parallel using Joblib
 # https://stackoverflow.com/a/50926231
 specifications_table = pd.DataFrame()
-num_cores = multiprocessing.cpu_count()
+num_cores = multiprocessing.cpu_count() - 1  # don't freeze the machine!
 final_results = Parallel(n_jobs=num_cores)(delayed(processSpecifications)(row) for row in all_data_list)
 
-# Save The results to a CSV file for future use
-##fix this:
-##    Traceback (most recent call last):
-##  File "F:\Code\predicting-car-price-from-scraped-data\scraping.py", line 383, in <module>
-##  File "C:\Users\Jason\AppData\Local\Programs\Python\Python37\lib\site-packages\pandas\core\generic.py", line 1478, in __nonzero__
-##    .format(self.__class__.__name__))
-##ValueError: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().
-if specs_csv:
-   specs_csv.to_csv(dataCsvFile)
+# Save The results to a txt file for future use
+if final_results:
+   dump2file("txt_files/final_data.txt", final_results)
+
+# See what results really is...
+logging.info("Type of Results: %s", type(final_results))
+#logging.info("Results: %s", final_results)
+
+# Try to get specifications_table...
+for dataframe in final_results:
+    specifications_table = pd.concat([specifications_table, dataframe], axis=1, sort=False)
+
+# See what is in specs table
+logging.info("Type of specs table: %s", type(specifications_table))
+#logging.info("specifications_table: %s", specifications_table)
+
+# Try to save specifications_table to CSV file
+try:
+    specifications_table.to_csv(dataCsvFile)
+except Exception as e:
+    logging.info("Failed to save specifications_table to CSV file :( Exception was: %s", e)
 
 # >>>DONE<<<
 logging.info("Finished getting data!")
-
-
-
-
 
