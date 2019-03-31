@@ -93,13 +93,11 @@ def try2readfile(scrap_name, scrap_list, scrap_file, async_function):
             logging.info("Found %s, with %s entries", scrap_name, len(scrap_list))
         else:
             logging.error("%s is empty, running web scraper", scrap_file)
-            scrap_list = []
-            asyncio.run(async_function())
+            scrap_list = asyncio.run(async_function())
         
     except Exception as e:
         logging.error("Didn't find the %s file, running scraper", scrap_file)
-        scrap_list = []
-        asyncio.run(async_function())
+        scrap_list = asyncio.run(async_function())
 
     logging.critical("Collected all %s successfully", scrap_name)
     return scrap_list
@@ -178,6 +176,7 @@ async def all_models():
 
     # Write the models to a file with the same name for easy retrieval.
     dump2file(all_models_file, all_models_list)
+    return all_models_list
 
 # Grabs all the years for every given make/model combination
 # Example: 2010 Toyota Corolla
@@ -217,6 +216,7 @@ async def all_years():
 
     # Write the years to a file with the same name for easy retrieval.
     dump2file(all_years_file, all_years_list)
+    return all_years_list
 
 # Specs for each Make + Model + Year
 # Appears to be around 3812 of these
@@ -256,6 +256,7 @@ async def all_specs():
     # Log how many of these combos we find & dump the results to a file
     logging.info("Found %s Make/Model/Year/Spec Combinations", len(all_specs_list))
     dump2file(all_specs_file, all_specs_list)
+    return all_specs_list
 
 # This must be all the trims for a given Make/Model/Year/Spec
 # Turns out there's ~32321 Make/Model/Year/Trim Combinations! Jeez.
@@ -304,6 +305,7 @@ async def all_trims():
     # Log how many of these trim combos we find & dump to file
     logging.info("Found %s Make/Model/Year/Trim Combinations", len(all_trims_list))
     dump2file(all_trims_file, all_trims_list)
+    return all_trims_list
 
 # Collect all the data on the 32,000 cars we found
 async def specifications():
@@ -317,6 +319,7 @@ async def specifications():
     # Log and dump to file
     logging.info("Found all the specifications data! Found %s data rows to process.", len(results))
     dump2file(all_data_file, all_data_list)
+    return results
 
 # Finally, process the results and save to a CSV for future use
 def processSpecifications(row):
@@ -388,6 +391,12 @@ num_cores = multiprocessing.cpu_count()
 final_results = Parallel(n_jobs=num_cores)(delayed(processSpecifications)(row) for row in all_data_list)
 
 # Save The results to a CSV file for future use
+##fix this:
+##    Traceback (most recent call last):
+##  File "F:\Code\predicting-car-price-from-scraped-data\scraping.py", line 383, in <module>
+##  File "C:\Users\Jason\AppData\Local\Programs\Python\Python37\lib\site-packages\pandas\core\generic.py", line 1478, in __nonzero__
+##    .format(self.__class__.__name__))
+##ValueError: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().
 if specs_csv:
    specs_csv.to_csv(dataCsvFile)
 
