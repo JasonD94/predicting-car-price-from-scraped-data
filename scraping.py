@@ -278,8 +278,8 @@ async def all_trims():
                 
                 div = soup.find_all("div", {"class": "block-inner"})[-1]
                 div_a = div.find_all("a")
-                logging.debug("Trims div: %s", div)
-                logging.debug("Trims div_a: %s", div_a)
+                #logging.debug("Trims div: %s", div)
+                #logging.debug("Trims div_a: %s", div_a)
 
                 #
                 # Ran into an exception on the len(div_a) call. I think the original code this is based on
@@ -293,7 +293,7 @@ async def all_trims():
                 try:
                     for i in range(len(div_a)):
                         all_trims_list.append(website + div_a[-i]['href'])
-                        logging.debug("i in range(len(div_a)): %s", div_a[-i]['href'])
+                        logging.debug("Trims URL: %s", div_a[-i]['href'])
 
                 except Exception as e:
                     logging.error('all_trims exception at for i in range(len(div_a)): %s %s', type(e), str(e))
