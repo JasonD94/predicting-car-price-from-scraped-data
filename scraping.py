@@ -73,7 +73,7 @@ async def asyncfetch(session, url, sem):
                 if response.status != 200:
                     response.raise_for_status()
                     logging.critical("Failed to get async request!")
-                logging.debug("Got response for: %s", url)
+                #logging.debug("Got response for: %s", url)
                 return await response.text()
     except Exception as e:
         logging.error('aiohttp exception: %s %s', type(e), str(e))
@@ -139,7 +139,7 @@ def all_makes():
         all_makes_list.append(website + a['href'])
         # Ex: Found Car Make: /make/new,toyota
         # <a class="add-zip " href="/make/new,toyota" title="Toyota">Toyota</a>
-        logging.debug("Found Car Make: %s", a['href'])
+        #logging.debug("Found Car Make: %s", a['href'])
 
     # Log how many makes we found with a different level so we can easily find it later
     logging.info("Found %s Car Makes", len(all_makes_list))
@@ -168,21 +168,28 @@ async def all_models():
     async with aiohttp.ClientSession() as session:
         results = await async_fetch_all(session, all_makes_list, sem)
 
-    for model in results:
-        soup = BeautifulSoup(model, 'html.parser')
-
-        for div in soup.find_all("div", {"class": "name"}):
-            all_models_list.append(website + div.find_all("a")[0]['href'])
-            # Ex: Found Model for /make/new,toyota: /cars/toyota_corolla
-            # <a href="/cars/toyota_corolla">Toyota Corolla</a>
-            logging.debug("Found Make Model Combo: %s", div.find_all("a")[0]['href'])
+    # See note under all_specs for what Joblib does
+    if results:
+        logging.info("Got results back for all_models: %s", len(results))
+        logging.info("Starting joblib processes to process results...")
+        Parallel(n_jobs=num_cores, verbose=0, require='sharedmem')(delayed(processModelsUrls)(model) for model in results)
 
     # Log how many Make/Model combos we find
+    logging.info("Joblib processing completed for all_models!")
     logging.info("Found %s Make & Model Combinations", len(all_models_list))
 
     # Write the models to a file with the same name for easy retrieval.
     dump2file(all_models_file, all_models_list)
     return all_models_list
+
+def processModelsUrls(model):
+    soup = BeautifulSoup(model, 'html.parser')
+
+    for div in soup.find_all("div", {"class": "name"}):
+        all_models_list.append(website + div.find_all("a")[0]['href'])
+        # Ex: Found Model for /make/new,toyota: /cars/toyota_corolla
+        # <a href="/cars/toyota_corolla">Toyota Corolla</a>
+        #logging.debug("Found Make Model Combo: %s", div.find_all("a")[0]['href'])
 
 # Grabs all the years for every given make/model combination
 # Example: 2010 Toyota Corolla
@@ -200,29 +207,37 @@ async def all_years():
     async with aiohttp.ClientSession() as session:
         results = await async_fetch_all(session, all_models_list, sem)
 
-    for year in results:
-        soup = BeautifulSoup(year, 'html.parser')
-
-        for div in soup.find_all("a", {"class": "btn avail-now first-item"}):
-            all_years_list.append(website + div['href'])
-            # I think this gets the current model year, such as:
-            # <a class="btn avail-now 1" href="/overview/toyota_corolla_2019" title="2019 Toyota Corolla Review">2019</a>
-            # Which would be "2019"
-            logging.debug("Current Model Year: %s", div['href'])
-            
-        for div in soup.find_all("a", {"class": "btn 1"}):
-            all_years_list.append(website + div['href'])
-            # Seems like this gets each additional Model Year, such as:
-            # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
-            # Which would be "2018"
-            logging.debug("Additional Model Years: %s", div['href'])
+    # See note under all_specs for what Joblib does
+    if results:
+        logging.info("Got results back for all_years: %s", len(results))
+        logging.info("Starting joblib processes to process results...")
+        Parallel(n_jobs=num_cores, verbose=0, require='sharedmem')(delayed(processYearsUrls)(year) for year in results) 
 
     # Log how many Make/Model/Years combos we find
+    logging.info("Joblib processing completed for all_years!")
     logging.info("Found %s Make/Model/Year Combinations", len(all_years_list))
 
     # Write the years to a file with the same name for easy retrieval.
     dump2file(all_years_file, all_years_list)
     return all_years_list
+
+# Separated out the processing of each URL so we can use Joblib for parallel processing
+def processYearsUrls(year):
+    soup = BeautifulSoup(year, 'html.parser')
+
+    for div in soup.find_all("a", {"class": "btn avail-now first-item"}):
+        all_years_list.append(website + div['href'])
+        # I think this gets the current model year, such as:
+        # <a class="btn avail-now 1" href="/overview/toyota_corolla_2019" title="2019 Toyota Corolla Review">2019</a>
+        # Which would be "2019"
+        #logging.debug("Current Model Year: %s", div['href'])
+        
+    for div in soup.find_all("a", {"class": "btn 1"}):
+        all_years_list.append(website + div['href'])
+        # Seems like this gets each additional Model Year, such as:
+        # <a class="btn  1" href="/overview/toyota_corolla_2018" title="2018 Toyota Corolla Review">2018</a>
+        # Which would be "2018"
+        #logging.debug("Additional Model Years: %s", div['href'])
 
 # Specs for each Make + Model + Year
 # Appears to be around 3812 of these
@@ -253,14 +268,14 @@ async def all_specs():
     # Using shared memory so we can just append the results to the all_specs_list
     # https://joblib.readthedocs.io/en/latest/parallel.html#shared-memory-semantics
     if results:
+        logging.info("Got results back for all_specs: %s", len(results))
+        logging.info("Starting joblib processes to process results...")
         Parallel(n_jobs=num_cores, verbose=0, require='sharedmem')(delayed(processSpecUrls)(spec) for spec in results)
 
     # Log how many of these combos we find & dump the results to a file
+    logging.info("Joblib processing completed for all_specs!")
     logging.info("Found %s Make/Model/Year/Spec Combinations", len(all_specs_list))
     dump2file(all_specs_file, all_specs_list)
-
-    logging.info("This is what we got back: %s", all_specs_list)
-    time.sleep(30)
     
     return all_specs_list
 
@@ -285,9 +300,11 @@ async def all_trims():
 
     # See note under all_specs for what Joblib does
     if results:
+        logging.info("Got results back for all_trims: %s", len(results))
         Parallel(n_jobs=num_cores, verbose=0, require='sharedmem')(delayed(processTrimUrls)(trim) for trim in results)
         
     # Log how many of these trim combos we find & dump to file
+    logging.info("Joblib processing completed for all_trims!")
     logging.info("Found %s Make/Model/Year/Trim Combinations", len(all_trims_list))
     dump2file(all_trims_file, all_trims_list)
     return all_trims_list
@@ -392,6 +409,7 @@ all_data_list = try2readfile("all_data_list", all_data_list, all_data_file, spec
 
 # Process the specification data in parallel using Joblib
 # https://stackoverflow.com/a/50926231
+logging.info("Starting joblib processing of all_data_list. All_data_list contains %s entries", len(all_data_list))
 specifications_table = pd.DataFrame()
 final_results = Parallel(n_jobs=num_cores)(delayed(processSpecifications)(row) for row in all_data_list)
 
