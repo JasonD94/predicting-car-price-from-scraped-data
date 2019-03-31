@@ -11,8 +11,9 @@ From the
 
 Modifying the [scraping.py](./scraping.py) Python Script to scrap the used 
 car section, plus optimizing it using some async libraries like 
-[aiohttp](https://aiohttp.readthedocs.io/en/stable/) and 
-[asyncio](https://docs.python.org/3/library/asyncio.html).
+[aiohttp](https://aiohttp.readthedocs.io/en/stable/), 
+[asyncio](https://docs.python.org/3/library/asyncio.html), and
+[joblib](https://joblib.readthedocs.io/en/latest/index.html)
 Also using [pickle](https://docs.python.org/3/library/pickle.html) 
 to store the results of each scrap so we don't need to repeatedly
 hit the same web pages multiple times.
@@ -61,10 +62,11 @@ which basically says to install lxml:
 pip install lxml
 ```
 
-4. My async version requires aiohttp & asyncio to run parallel web requests:
+4. My async version requires aiohttp, asyncio and to run parallel web requests
+and process the specs data in parallel:
 
 ```console
-pip install aiohttp
+pip install aiohttp joblib
 ```
 
 [asyncio should be installed already, if not pip install it too]

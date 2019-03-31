@@ -4,6 +4,8 @@ import pandas as pd
 import aiohttp
 import asyncio
 import pickle
+import multiprocessing
+from joblib import Parallel, delayed
 from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
 
@@ -18,6 +20,7 @@ all_models_file = "txt_files/all_models_file.txt"
 all_years_file = "txt_files/all_years_file.txt"
 all_specs_file = "txt_files/all_specs_file.txt"
 all_trims_file = "txt_files/all_trims_file.txt"
+all_data_file = "txt_files/all_data_file.txt"
 
 # Code seems to be repeatedly calling out to the CarConnection website. No wonder it takes 8 hours to run currently...
 # Instead, let's cache the basics like Makes & Models to speed this up.
@@ -26,6 +29,7 @@ all_models_list = []    # Make_Models like Toyota Corolla
 all_years_list = []     # Make_Model_Years like Toyota Corolla 2010
 all_specs_list = []     # Make_Model_Year_Spec like Toyota Corolla 2010 XYZ
 all_trims_list = []     # Make_Model_Year_Spec_Trim like Toyota Corolla 2010 XYZ ABC
+all_data_list = []      # All the data scraped for the all_trims_list
 
 # Some logging for scraping.py, to both understand the script better and have debug info if it crashes
 # or dies mid scrap. Logging is built into Python
@@ -305,36 +309,6 @@ async def all_trims():
     # Write the trims to a file
     dump2file(all_trims_file, all_trims_list)
 
-logging.info("Starting scraping.py ...")
-
-# Optimized as much as I could out of this. Async http & cache results to files.
-# Order is:
-# 1. Gather all Makes (Ford/Chevy/etc)
-# 2. For each Make, gather all Models (Corolla, F150, etc)
-# 3. For every Make/Model, gather all Years (2010, 2011, etc)
-# 4. For every Make/Model/Year, gather all Specs
-# 5. For every Make/Model/Year/Spec, gather all Trims
-all_makes_list = all_makes()
-logging.critical("Collected all Makes successfully")
-
-# Now caching the models list
-all_models_list = try2readfile("all_models_list", all_models_list, all_models_file, all_models)
-logging.info("Size of all_models_list: %s", len(all_models_list))
-
-# Now caching the years list
-all_years_list = try2readfile("all_years_list", all_years_list, all_years_file, all_years)
-
-# Now caching the specs list
-all_specs_list = try2readfile("all_specs_list", all_specs_list, all_specs_file, all_specs)
-
-# Now caching the trims list
-all_trims_list = try2readfile("all_trims_list", all_trims_list, all_trims_file, all_trims)
-
-# Write this all out to a CSV file in csv_files
-pd.DataFrame(all_trims_list).to_csv(trimsCsvFile, index=False, header=None)
-
-logging.info("Scrapping Make/Model/Year/Spec/Trim **DONE**")
-
 # This must grab specs for everything, looks like price + MSRP
 async def specifications():
     # 32,000 URLs to hit, so limit of 5 concurrent requests to avoid overwhelming the server
@@ -343,7 +317,11 @@ async def specifications():
     # GATHER ALL THE SPECS!1!1
     async with aiohttp.ClientSession() as session:
         results = await async_fetch_all(session, all_trims_list, sem)
-             
+
+    logging.info("Found all the specifications data! Found %s data rows to process.", len(results))
+    return results
+
+def processSpecifications(row):
     specifications_table = pd.DataFrame()
 
     if results:
@@ -375,14 +353,56 @@ async def specifications():
     logging.info("Finishing scrapin' specs")
     return specifications_table
 
-# With all 32,000 vehicles, we can finally pull in all their specs. Woo hoo!
-logging.info("Specifications Scrapin' time!1!")
-specs_csv = asyncio.run(specifications())
+logging.info("Starting scraping.py ...")
 
+# Optimized as much as I could out of this. Async http & cache results to files.
+# Order is:
+# 1. Gather all Makes (Ford/Chevy/etc)
+# 2. For each Make, gather all Models (Corolla, F150, etc)
+# 3. For every Make/Model, gather all Years (2010, 2011, etc)
+# 4. For every Make/Model/Year, gather all Specs
+# 5. For every Make/Model/Year/Spec, gather all Trims
+# 6. For everything found in #5 (32,000+ cars), scrap all the spec data
+# 7. Write the results out to a csv file - final results should end up in csv_files/the_big_data.csv
+all_makes_list = all_makes()
+logging.critical("Collected all Makes successfully")
+
+# Now caching the models list
+all_models_list = try2readfile("all_models_list", all_models_list, all_models_file, all_models)
+logging.info("Size of all_models_list: %s", len(all_models_list))
+
+# Now caching the years list
+all_years_list = try2readfile("all_years_list", all_years_list, all_years_file, all_years)
+
+# Now caching the specs list
+all_specs_list = try2readfile("all_specs_list", all_specs_list, all_specs_file, all_specs)
+
+# Now caching the trims list
+all_trims_list = try2readfile("all_trims_list", all_trims_list, all_trims_file, all_trims)
+
+# Write this all out to a CSV file in csv_files
+pd.DataFrame(all_trims_list).to_csv(trimsCsvFile, index=False, header=None)
+
+logging.info("Scrapping Make/Model/Year/Spec/Trim **DONE**")
+
+# With all 32,000 vehicles, we can finally pull in all their specs. Woo hoo!
+# Also now caching the results too for future processing :)
+logging.info("Specifications Scrapin' time!1!")
+all_data_list = try2readfile("all_data_list", all_data_list, all_data_file, specifications)
+
+# Process the specification data in parallel using Joblib
+# https://stackoverflow.com/a/50926231
+num_cores = multiprocessing.cpu_count()
+final_results = Parallel(n_jobs=num_cores)(delayed(processSpecifications)(row) for row in all_data_list)
+
+# Save The results to a CSV file for future use
 if specs_csv:
    specs_csv.to_csv(dataCsvFile)
 
+# >>>DONE<<<
 logging.info("Finished getting data!")
+
+
 
 
 
