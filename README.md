@@ -62,8 +62,8 @@ which basically says to install lxml:
 pip install lxml
 ```
 
-4. My async version requires aiohttp, asyncio and to run parallel web requests
-and process the specs data in parallel:
+4. My async version requires aiohttp, asyncio and joblib to run async web requests
+and process the specs data in parallel across multiple CPU Cores:
 
 ```console
 pip install aiohttp joblib
@@ -85,6 +85,19 @@ platform. My machine is a 64 bit version of Windows 10, so I grabbed this downlo
 
 Which can be found here:
 [python.org/downloads/release/python-373/](https://www.python.org/downloads/release/python-373/)
+
+# Notes
+
+* Running this script requires a ton of RAM. I saw RAM usage spike at around 10GB
+on my machine. You should have at least 16GB of RAM, and a strong processor such
+as an Intel i5 / i7. The more cores, the better, since I have joblib setup to use
+one less than the total number of processor cores. For example, my i7 4790k has 
+4 cores / 8 threads, so joblib will run across 7 threads to process all the data that comes back.
+
+* It took me around 53 minutes to run a complete web scrap and process data into
+the final CSV file. This is with a fairly powerful desktop machine (mentioned above,
+but i7 4790k plus 16GB), so your results may vary. Probably best to not run this
+on a laptop, ancient desktop, toaster, etc.
 
 ## *Random Note:* an IDLE Dark Mode Theme
 Place [config-highlight.cfg](./config-highlight.cfg) inside **HOMEDIR**/.idlerc/ and go to 

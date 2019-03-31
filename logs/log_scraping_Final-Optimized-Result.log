@@ -1,0 +1,51 @@
+03-31-19T16:30:19 - INFO - ************** Starting... **************
+03-31-19T16:30:19 - INFO - This will get logged to a file called log_scraping.log
+03-31-19T16:30:19 - INFO - Starting scraping.py ...
+03-31-19T16:30:19 - ERROR - Didn't find the all_makes_list file, running scraper.py on it
+03-31-19T16:30:20 - INFO - Found 43 Car Makes
+03-31-19T16:30:20 - INFO - Car makes list: ['https://www.thecarconnection.com/make/new,acura', 'https://www.thecarconnection.com/make/new,alfa-romeo', 'https://www.thecarconnection.com/make/new,aston-martin', 'https://www.thecarconnection.com/make/new,audi', 'https://www.thecarconnection.com/make/new,bentley', 'https://www.thecarconnection.com/make/new,bmw', 'https://www.thecarconnection.com/make/new,buick', 'https://www.thecarconnection.com/make/new,cadillac', 'https://www.thecarconnection.com/make/new,chevrolet', 'https://www.thecarconnection.com/make/new,chrysler', 'https://www.thecarconnection.com/make/new,dodge', 'https://www.thecarconnection.com/make/new,ferrari', 'https://www.thecarconnection.com/make/new,fiat', 'https://www.thecarconnection.com/make/new,ford', 'https://www.thecarconnection.com/make/new,genesis', 'https://www.thecarconnection.com/make/new,gmc', 'https://www.thecarconnection.com/make/new,honda', 'https://www.thecarconnection.com/make/new,hyundai', 'https://www.thecarconnection.com/make/new,infiniti', 'https://www.thecarconnection.com/make/new,jaguar', 'https://www.thecarconnection.com/make/new,jeep', 'https://www.thecarconnection.com/make/new,kia', 'https://www.thecarconnection.com/make/new,lamborghini', 'https://www.thecarconnection.com/make/new,land-rover', 'https://www.thecarconnection.com/make/new,lexus', 'https://www.thecarconnection.com/make/new,lincoln', 'https://www.thecarconnection.com/make/new,lotus', 'https://www.thecarconnection.com/make/new,maserati', 'https://www.thecarconnection.com/make/new,mazda', 'https://www.thecarconnection.com/make/new,mclaren', 'https://www.thecarconnection.com/make/new,mercedes-benz', 'https://www.thecarconnection.com/make/new,mini', 'https://www.thecarconnection.com/make/new,mitsubishi', 'https://www.thecarconnection.com/make/new,nissan', 'https://www.thecarconnection.com/make/new,porsche', 'https://www.thecarconnection.com/make/new,ram', 'https://www.thecarconnection.com/make/new,rolls-royce', 'https://www.thecarconnection.com/make/new,smart', 'https://www.thecarconnection.com/make/new,subaru', 'https://www.thecarconnection.com/make/new,tesla', 'https://www.thecarconnection.com/make/new,toyota', 'https://www.thecarconnection.com/make/new,volkswagen', 'https://www.thecarconnection.com/make/new,volvo']
+03-31-19T16:30:20 - CRITICAL - Collected all Makes successfully
+03-31-19T16:30:20 - ERROR - Didn't find the txt_files/all_models_file.txt file, running scraper
+03-31-19T16:30:20 - DEBUG - Using selector: SelectSelector
+03-31-19T16:30:20 - INFO - async_fetch_all: 43 <asyncio.locks.Semaphore object at 0x0000027012FB13C8 [unlocked, value:15]>
+03-31-19T16:30:20 - INFO - Got results back for all_models: 43
+03-31-19T16:30:20 - INFO - Starting joblib processes to process results...
+03-31-19T16:30:22 - INFO - Joblib processing completed for all_models!
+03-31-19T16:30:22 - INFO - Found 432 Make & Model Combinations
+03-31-19T16:30:22 - CRITICAL - Collected all all_models_list successfully
+03-31-19T16:30:22 - INFO - Size of all_models_list: 432
+03-31-19T16:30:22 - ERROR - Didn't find the txt_files/all_years_file.txt file, running scraper
+03-31-19T16:30:22 - DEBUG - Using selector: SelectSelector
+03-31-19T16:30:22 - INFO - async_fetch_all: 432 <asyncio.locks.Semaphore object at 0x0000027014140B70 [unlocked, value:15]>
+03-31-19T16:30:27 - INFO - Got results back for all_years: 432
+03-31-19T16:30:27 - INFO - Starting joblib processes to process results...
+03-31-19T16:30:53 - INFO - Joblib processing completed for all_years!
+03-31-19T16:30:53 - INFO - Found 3931 Make/Model/Year Combinations
+03-31-19T16:30:53 - CRITICAL - Collected all all_years_list successfully
+03-31-19T16:30:53 - ERROR - Didn't find the txt_files/all_specs_file.txt file, running scraper
+03-31-19T16:30:53 - DEBUG - Using selector: SelectSelector
+03-31-19T16:30:53 - INFO - async_fetch_all: 3931 <asyncio.locks.Semaphore object at 0x00000270153E9D30 [unlocked, value:15]>
+03-31-19T16:31:55 - INFO - Got results back for all_specs: 3931
+03-31-19T16:31:55 - INFO - Starting joblib processes to process results...
+03-31-19T16:35:58 - INFO - Joblib processing completed for all_specs!
+03-31-19T16:35:58 - INFO - Found 3812 Make/Model/Year/Spec Combinations
+03-31-19T16:35:58 - CRITICAL - Collected all all_specs_list successfully
+03-31-19T16:35:58 - ERROR - Didn't find the txt_files/all_trims_file.txt file, running scraper
+03-31-19T16:35:58 - DEBUG - Using selector: SelectSelector
+03-31-19T16:35:58 - INFO - async_fetch_all: 3812 <asyncio.locks.Semaphore object at 0x0000027014F14198 [unlocked, value:15]>
+03-31-19T16:36:01 - ERROR - aiohttp exception: <class 'aiohttp.client_exceptions.TooManyRedirects'> 0, message=''
+03-31-19T16:36:44 - INFO - Got results back for all_trims: 3812
+03-31-19T16:36:47 - ERROR - found a null trim: None
+03-31-19T16:40:57 - INFO - Joblib processing completed for all_trims!
+03-31-19T16:40:57 - INFO - Found 32323 Make/Model/Year/Trim Combinations
+03-31-19T16:40:57 - CRITICAL - Collected all all_trims_list successfully
+03-31-19T16:40:57 - INFO - Scrapping Make/Model/Year/Spec/Trim **DONE**
+03-31-19T16:40:57 - INFO - Specifications Scrapin' time!1!
+03-31-19T16:40:57 - ERROR - Didn't find the txt_files/all_data_file.txt file, running scraper
+03-31-19T16:40:57 - DEBUG - Using selector: SelectSelector
+03-31-19T16:40:57 - INFO - async_fetch_all: 32323 <asyncio.locks.Semaphore object at 0x0000027012E924E0 [unlocked, value:15]>
+03-31-19T16:53:12 - INFO - Found all the specifications data! Found 32323 data rows to process.
+03-31-19T16:55:08 - CRITICAL - Collected all all_data_list successfully
+03-31-19T16:55:08 - INFO - Starting joblib processing of all_data_list. All_data_list contains 32323 entries
+03-31-19T17:22:29 - INFO - Type of specs table: <class 'pandas.core.frame.DataFrame'>
+03-31-19T17:23:37 - INFO - Finished getting data!

@@ -1,0 +1,12 @@
+# txt files that may be yuge
+txt_files/all_trims_file.txt
+txt_files/final_data.txt
+txt_files/all_data_file.txt
+txt_files/test/final_data.txt
+txt_files/test/all_data_file.txt
+
+# ignore the CSV files, they will be yugge
+csv_files/*
+
+# ignore any log files unless they're useful for examples
+log_scraping.log
