@@ -12,10 +12,10 @@ from joblib import Parallel, delayed
 from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
 
-website = "https://www.thecarconnection.com"
+website = "https://www.thecarconnection.com" # Site to scrap from
 
 # For parallel processing data
-num_cores = multiprocessing.cpu_count() - 1  # don't freeze the machine!
+num_cores = multiprocessing.cpu_count() - 1  # don't freeze the machine! leave a core free!
 
 # File Names for storing to & pulling from for future runs
 trimsCsvFile = "csv_files/every_single_car.csv"
@@ -40,7 +40,7 @@ all_data_list = []      # All the data scraped for the all_trims_list
 # Some logging for scraping.py, to both understand the script better and have debug info if it crashes
 # or dies mid scrap. Logging is built into Python
 # https://realpython.com/python-logging/
-logging.basicConfig(filename='scrapping.log',
+logging.basicConfig(filename='log_scraping.log',
                     filemode='w',
                     format='%(asctime)s - %(levelname)s - %(message)s',
                     datefmt='%m-%d-%yT%H:%M:%S',
@@ -59,7 +59,7 @@ logging.getLogger('').addHandler(console)
 
 # Logging should be working now
 logging.info("************** Starting... **************")
-logging.info('This will get logged to a file called scrapping.log')
+logging.info('This will get logged to a file called log_scraping.log')
 
 # Original fetch function
 def fetch(hostname, filename):
@@ -157,9 +157,9 @@ def all_makes():
 async def all_models():
 
     # Don't overwhelm aiohttp!
-    # 10 Requests *at most* at a time
+    # 15 Requests *at most* at a time
     # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
-    sem = asyncio.Semaphore(10)
+    sem = asyncio.Semaphore(15)
 
     # Trying some async Python for looping to make this go super quick (hopefully)
     # Results: 5 seconds quicker for this call.
@@ -198,9 +198,9 @@ def processModelsUrls(model):
 async def all_years():
 
     # Don't overwhelm aiohttp!
-    # 10 Requests *at most* at a time
+    # 15 Requests *at most* at a time
     # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
-    sem = asyncio.Semaphore(10)
+    sem = asyncio.Semaphore(15)
 
     # Async call to get all make/model/year combos (3931 of these!)
     # Results: 
@@ -244,7 +244,7 @@ def processYearsUrls(year):
 async def all_specs():
 
     # This call has ~3931 URLs, so we don't want to overwhelm aiohttp
-    # Will limit it to 5 connections at the same time, and make it wait til those respond.
+    # Will limit it to 10 connections at the same time, and make it wait til those respond.
     # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
     sem = asyncio.Semaphore(10)
 
@@ -290,7 +290,7 @@ def processSpecUrls(spec):
 # Turns out there's ~32321 Make/Model/Year/Trim Combinations! Jeez.
 async def all_trims():
 
-    # Same as all_specs(), this has ~3800 URLs to hit so limit of 4 concurrent requests
+    # Same as all_specs(), this has ~3800 URLs to hit so limit of 10 concurrent requests
     # to avoid overwhelming the server
     sem = asyncio.Semaphore(10)
     
@@ -339,7 +339,7 @@ def processTrimUrls(trim):
 
 # Collect all the data on the 32,000 cars we found
 async def specifications():
-    # 32,000 URLs to hit, so limit of 5 concurrent requests to avoid overwhelming the server
+    # 32,000 URLs to hit, so limit of 10 concurrent requests to avoid overwhelming the server
     sem = asyncio.Semaphore(10)
     
     # GATHER ALL THE SPECS!1!1
