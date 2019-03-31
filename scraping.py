@@ -225,7 +225,7 @@ async def all_specs():
     # This call has ~3931 URLs, so we don't want to overwhelm aiohttp
     # Will limit it to 5 connections at the same time, and make it wait til those respond.
     # https://pawelmhm.github.io/asyncio/python/aiohttp/2016/04/22/asyncio-aiohttp.html
-    sem = asyncio.Semaphore(5)
+    sem = asyncio.Semaphore(10)
 
     # Async call to get all the specs for every make/model/year combo
     async with aiohttp.ClientSession() as session:
@@ -264,7 +264,7 @@ async def all_trims():
 
     # Same as all_specs(), this has ~3800 URLs to hit so limit of 4 concurrent requests
     # to avoid overwhelming the server
-    sem = asyncio.Semaphore(5)
+    sem = asyncio.Semaphore(10)
     
     # GATHER ALL THE TRIMS!1!1
     async with aiohttp.ClientSession() as session:
@@ -310,7 +310,7 @@ async def all_trims():
 # Collect all the data on the 32,000 cars we found
 async def specifications():
     # 32,000 URLs to hit, so limit of 5 concurrent requests to avoid overwhelming the server
-    sem = asyncio.Semaphore(5)
+    sem = asyncio.Semaphore(10)
     
     # GATHER ALL THE SPECS!1!1
     async with aiohttp.ClientSession() as session:
@@ -337,7 +337,7 @@ def processSpecifications(row):
         row_value = div.find_all("span")[1].text
         specifications_df.loc[row_name] = row_value
         
-    # Only returning each DataFrame - we can concat these together after
+    # Only returning each DataFrame - we can concat these together after into a single DataFrame
     return specifications_df
 
 logging.info("Starting scraping.py ...")
@@ -387,17 +387,12 @@ final_results = Parallel(n_jobs=num_cores)(delayed(processSpecifications)(row) f
 if final_results:
    dump2file("txt_files/final_data.txt", final_results)
 
-# See what results really is...
-logging.info("Type of Results: %s", type(final_results))
-#logging.info("Results: %s", final_results)
-
-# Try to get specifications_table...
-for dataframe in final_results:
-    specifications_table = pd.concat([specifications_table, dataframe], axis=1, sort=False)
+# Concat all the data frames together
+# https://stackoverflow.com/a/39316680
+specifications_table = pd.concat(final_results, axis=1, sort=False)
 
 # See what is in specs table
 logging.info("Type of specs table: %s", type(specifications_table))
-#logging.info("specifications_table: %s", specifications_table)
 
 # Try to save specifications_table to CSV file
 try:
