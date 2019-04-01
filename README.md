@@ -38,10 +38,10 @@ for [Installing Packages](https://packaging.python.org/tutorials/installing-pack
 python -m pip install --upgrade pip setuptools wheel
 ```
 
-2. Install Beautiful Soup, Request, urlopen, pandas
+2. Install Beautiful Soup, Request, urlopen, pandas, scipy
 
 ```console
-pip install bs4 Request urlopen pandas
+pip install bs4 Request urlopen pandas scipy
 ```
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; You should see messages like *"Successfully installed XYZ package"* in the console
